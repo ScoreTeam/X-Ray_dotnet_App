@@ -42,7 +42,7 @@ namespace MyWinFormsApp
         private void InitializeComponent()
         {
             this.Text = "Image Editor";
-            this.MinimumSize = new Size(1280, 720);
+            this.MinimumSize = new Size(1280, 960);
 
             FlowLayoutPanel flowPanel = new FlowLayoutPanel
             {
@@ -100,7 +100,7 @@ namespace MyWinFormsApp
 
             Panel imagePanel = new Panel
             {
-                Height = 480,
+                Height = 720,
                 Dock = DockStyle.Top,
                 AutoScroll = true,
                 Padding = new Padding(10),
@@ -128,7 +128,7 @@ namespace MyWinFormsApp
 
             txtInput = new TextBox
             {
-                Width = 300,
+                Width = 400,
                 Height = 100,
                 Multiline = true,
                 Margin = new Padding(10)
@@ -281,21 +281,28 @@ namespace MyWinFormsApp
         {
             if (brightness < 64)
             {
-                int red = brightness * 4;
-                return Color.FromArgb(red, 0, 255);
+                //between blue and green
+                int blue = 255;
+                int green = brightness * 4;
+                return Color.FromArgb(0, green, blue);
             }
             else if (brightness < 128)
             {
-                int green = (brightness - 64) * 4;
-                return Color.FromArgb(255, green, 255);
+                //between green and yellow
+                int green = 255;
+                int red = (brightness - 64) * 4;
+                return Color.FromArgb(red, green, 0);
             }
             else if (brightness < 192)
             {
+                //between yellow and red
+                int red = 255;
                 int green = 255 - ((brightness - 128) * 4);
-                return Color.FromArgb(255, green, 0);
+                return Color.FromArgb(red, green, 0);
             }
             else
             {
+                //between red and violet
                 int red = 255;
                 int blue = (brightness - 192) * 4;
                 return Color.FromArgb(red, 0, blue);
