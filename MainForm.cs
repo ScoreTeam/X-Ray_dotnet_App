@@ -11,11 +11,11 @@ namespace MyWinFormsApp
     public partial class MainForm : Form
     {
         private Bitmap originalImage;
-        private Bitmap GrayImage;
+        private Bitmap grayImage;
         private Bitmap modifiedGrayImage;
         private Button btnBrowse;
         private Button btnCrop;
-        private Button IdentifyArea;
+        private Button btnIdentifyArea;
         private PictureBox pictureBoxOriginal;
         private Button btnSave;
         private Point startPoint;
@@ -27,8 +27,8 @@ namespace MyWinFormsApp
         private enum ColorMap
         {
             Rainbow,
+            Jet,
             Ocean,
-            Sunset,
             None,
         }
 
@@ -41,7 +41,7 @@ namespace MyWinFormsApp
 
         private void InitializeComponent()
         {
-            this.Text = "Image Editor";
+            this.Text = "Medical Image Editor";
             this.MinimumSize = new Size(1280, 960);
 
             FlowLayoutPanel flowPanel = new FlowLayoutPanel
@@ -58,6 +58,8 @@ namespace MyWinFormsApp
                 Margin = new Padding(10)
             };
             btnBrowse.Click += btnBrowse_Click;
+            ToolTip btnBrowseToolTip = new ToolTip();
+            btnBrowseToolTip.SetToolTip(btnBrowse, "Browse and load an image.");
 
             btnSave = new Button
             {
@@ -66,6 +68,16 @@ namespace MyWinFormsApp
                 Margin = new Padding(10)
             };
             btnSave.Click += btnSave_Click;
+            ToolTip btnSaveToolTip = new ToolTip();
+            btnSaveToolTip.SetToolTip(btnSave, "Save the modified image.");
+
+            Label lblColorMap = new Label
+            {
+                Text = "Select Color Map:",
+                Margin = new Padding(10),
+                TextAlign = ContentAlignment.MiddleCenter,
+                AutoSize = true
+            };
 
             cmbColorMap = new ComboBox
             {
@@ -75,6 +87,8 @@ namespace MyWinFormsApp
             cmbColorMap.Items.AddRange(Enum.GetNames(typeof(ColorMap)));
             cmbColorMap.SelectedIndex = 0;
             cmbColorMap.SelectedIndexChanged += cmbColorMap_SelectedIndexChanged;
+            ToolTip cmbColorMapToolTip = new ToolTip();
+            cmbColorMapToolTip.SetToolTip(cmbColorMap, "Select a color map for the image.");
 
             btnCrop = new Button
             {
@@ -83,20 +97,25 @@ namespace MyWinFormsApp
                 Margin = new Padding(10)
             };
             btnCrop.Click += btnCrop_Click;
+            ToolTip btnCropToolTip = new ToolTip();
+            btnCropToolTip.SetToolTip(btnCrop, "Crop the selected region of the image.");
 
-            IdentifyArea = new Button
+            btnIdentifyArea = new Button
             {
                 AutoSize = true,
                 Text = "Identify Area",
                 Margin = new Padding(10)
             };
-            IdentifyArea.Click += btnIdentifyArea_Click;
+            btnIdentifyArea.Click += btnIdentifyArea_Click;
+            ToolTip btnIdentifyAreaToolTip = new ToolTip();
+            btnIdentifyAreaToolTip.SetToolTip(btnIdentifyArea, "Apply color map to the selected region.");
 
             flowPanel.Controls.Add(btnBrowse);
             flowPanel.Controls.Add(btnSave);
+            flowPanel.Controls.Add(lblColorMap);
             flowPanel.Controls.Add(cmbColorMap);
             flowPanel.Controls.Add(btnCrop);
-            flowPanel.Controls.Add(IdentifyArea);
+            flowPanel.Controls.Add(btnIdentifyArea);
 
             Panel imagePanel = new Panel
             {
@@ -126,6 +145,14 @@ namespace MyWinFormsApp
                 Padding = new Padding(10)
             };
 
+            Label lblTextInput = new Label
+            {
+                Text = "Enter Annotation Text:",
+                Margin = new Padding(10),
+                TextAlign = ContentAlignment.MiddleCenter,
+                AutoSize = true
+            };
+
             txtInput = new TextBox
             {
                 Width = 400,
@@ -141,7 +168,10 @@ namespace MyWinFormsApp
                 Margin = new Padding(10)
             };
             btnSaveText.Click += btnSaveText_Click;
+            ToolTip btnSaveTextToolTip = new ToolTip();
+            btnSaveTextToolTip.SetToolTip(btnSaveText, "Add a text annotation to the image.");
 
+            textPanel.Controls.Add(lblTextInput);
             textPanel.Controls.Add(txtInput);
             textPanel.Controls.Add(btnSaveText);
 
@@ -173,8 +203,8 @@ namespace MyWinFormsApp
                     }
 
                     pictureBoxOriginal.Image = modifiedGrayImage;
-                    GrayImage = new Bitmap(grayscale.Width, grayscale.Height, PixelFormat.Format24bppRgb);
-                    using (Graphics g = Graphics.FromImage(GrayImage))
+                    grayImage = new Bitmap(grayscale.Width, grayscale.Height, PixelFormat.Format24bppRgb);
+                    using (Graphics g = Graphics.FromImage(grayImage))
                     {
                         g.DrawImage(grayscale.ToBitmap(), new Rectangle(0, 0, grayscale.Width, grayscale.Height));
                     }
@@ -249,7 +279,7 @@ namespace MyWinFormsApp
                 {
                     if (x >= 0 && x < modifiedGrayImage.Width && y >= 0 && y < modifiedGrayImage.Height)
                     {
-                        Color originalColor = GrayImage.GetPixel(x, y);
+                        Color originalColor = grayImage.GetPixel(x, y);
                         int brightness = originalColor.R;
 
                         Color mappedColor = MapBrightnessToColor(brightness, colorMap);
@@ -266,14 +296,12 @@ namespace MyWinFormsApp
             {
                 case ColorMap.Rainbow:
                     return MapBrightnessToColor_Rainbow(brightness);
+                case ColorMap.Jet:
+                    return MapBrightnessToColor_Jet(brightness);
                 case ColorMap.Ocean:
                     return MapBrightnessToColor_Ocean(brightness);
-                case ColorMap.Sunset:
-                    return MapBrightnessToColor_Sunset(brightness);
-                case ColorMap.None:
-                    return MapGray(brightness);
                 default:
-                    return Color.White;
+                    return Color.FromArgb(brightness, brightness, brightness);
             }
         }
 
@@ -308,6 +336,13 @@ namespace MyWinFormsApp
                 return Color.FromArgb(red, 0, blue);
             }
         }
+        private Color MapBrightnessToColor_Jet(int brightness)
+        {
+            int r = (int)(255 * Math.Min(1.0, Math.Max(0.0, (brightness - 64) / 64.0)));
+            int g = (int)(255 * Math.Min(1.0, Math.Max(0.0, (brightness - 128) / 64.0)));
+            int b = (int)(255 * Math.Min(1.0, Math.Max(0.0, (brightness - 192) / 64.0)));
+            return Color.FromArgb(r, g, b);
+        }
 
         private Color MapBrightnessToColor_Ocean(int brightness)
         {
@@ -331,37 +366,6 @@ namespace MyWinFormsApp
                 int green = 128 - (brightness - 192);
                 return Color.FromArgb(127 + green, 255, 255);
             }
-        }
-
-        private Color MapBrightnessToColor_Sunset(int brightness)
-        {
-            if (brightness < 64)
-            {
-                int red = brightness * 4;
-                return Color.FromArgb(red, 255, 0);
-            }
-            else if (brightness < 128)
-            {
-                int red = 255;
-                int green = 255 - (brightness - 64) * 4;
-                return Color.FromArgb(red, green, 0);
-            }
-            else if (brightness < 192)
-            {
-                int red = 255;
-                int green = 64 - (brightness - 128);
-                return Color.FromArgb(red, green, 0);
-            }
-            else
-            {
-                int red = 128 - (brightness - 192);
-                return Color.FromArgb(red, 0, 0);
-            }
-        }
-
-        private Color MapGray(int brightness)
-        {
-            return Color.FromArgb(brightness, brightness, brightness);
         }
 
         private void btnIdentifyArea_Click(object sender, EventArgs e)
@@ -398,7 +402,7 @@ namespace MyWinFormsApp
 
             Rectangle cropRect = GetRectangle(startPoint, endPoint);
 
-            GrayImage = CropImage(GrayImage, cropRect);
+            grayImage = CropImage(grayImage, cropRect);
             modifiedGrayImage = CropImage(modifiedGrayImage, cropRect);
 
             pictureBoxOriginal.Image = modifiedGrayImage;
@@ -446,16 +450,6 @@ namespace MyWinFormsApp
                 return;
             }
 
-            // SaveFileDialog saveFileDialog = new SaveFileDialog
-            // {
-            //     Filter = "Text Files|*.txt"
-            // };
-            // if (saveFileDialog.ShowDialog() == DialogResult.OK)
-            // {
-            //     File.WriteAllText(saveFileDialog.FileName, text);
-            //     MessageBox.Show("Text saved successfully.");
-            // }
-
             using (Graphics g = Graphics.FromImage(modifiedGrayImage))
             {
                 using (Font font = new Font("Arial", 16))
@@ -467,6 +461,6 @@ namespace MyWinFormsApp
             pictureBoxOriginal.Image = modifiedGrayImage;
         }
 
-        private Color selectedColor = Color.Yellow;
+        private Color selectedColor = Color.White;
     }
 }
