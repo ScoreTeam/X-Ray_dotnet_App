@@ -454,13 +454,13 @@ namespace MyWinFormsApp
             {
                 using (Font font = new Font("Arial", 16))
                 {
-                    g.DrawString(txtInput.Text, font, Brushes.Yellow, startPoint);
+                    g.DrawString(txtInput.Text, font, Brushes.White, startPoint);
                 }
             }
 
             pictureBoxOriginal.Image = modifiedGrayImage;
         }
 
-        private Color selectedColor = Color.White;
+        private Color selectedColor = Color.Yellow;
     }
 }
