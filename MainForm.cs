@@ -8,6 +8,7 @@ using System.IO;
 using System.Drawing.Drawing2D;
 using NAudio;
 using NAudio.Wave;
+using Microsoft.VisualBasic;
 
 namespace MyWinFormsApp
 {
@@ -45,12 +46,13 @@ namespace MyWinFormsApp
 
         private ColorMap selectedColorMap;
         private Shape selectedShape;
-        // for recording the audio part
+        // for recording the audio part (some of those are not used i will delete them later)
         private Button btnRecordAudio;
         private WaveIn waveSource;
         private WaveFileWriter waveFileWriter;
         private string audioFilePath;
         // end of the audio part
+
 
         public MainForm()
         {
@@ -588,25 +590,75 @@ namespace MyWinFormsApp
             return croppedImage;
         }
 
+        // private void btnSave_Click(object sender, EventArgs e)
+        // {
+        //     if (modifiedGrayImage == null)
+        //     {
+        //         MessageBox.Show("No colored image to save.");
+        //         return;
+        //     }
+
+        //     SaveFileDialog saveFileDialog = new SaveFileDialog
+        //     {
+        //         Filter = "JPEG Image|*.jpg|PNG Image|*.png"
+        //     };
+        //     if (saveFileDialog.ShowDialog() == DialogResult.OK)
+        //     {
+        //         modifiedGrayImage.Save(saveFileDialog.FileName);
+        //         MessageBox.Show("Colored image saved successfully.");
+        //     }
+        // }
+
+
+        // private void btnSaveText_Click(object sender, EventArgs e)
+        // {
+        //     if (string.IsNullOrEmpty(txtInput.Text))
+        //     {
+        //         MessageBox.Show("Please enter text to save.");
+        //         return;
+        //     }
+
+        //     SaveFileDialog saveFileDialog = new SaveFileDialog
+        //     {
+        //         Filter = "Text File|*.txt"
+        //     };
+
+        //     if (saveFileDialog.ShowDialog() == DialogResult.OK)
+        //     {
+        //         File.WriteAllText(saveFileDialog.FileName, txtInput.Text);
+        //         MessageBox.Show("Text saved successfully.");
+        //     }
+        // }
         private void btnSave_Click(object sender, EventArgs e)
-        {
-            if (modifiedGrayImage == null)
-            {
-                MessageBox.Show("No colored image to save.");
-                return;
-            }
+{
+    if (modifiedGrayImage == null)
+    {
+        MessageBox.Show("No colored image to save.");
+        return;
+    }
 
-            SaveFileDialog saveFileDialog = new SaveFileDialog
-            {
-                Filter = "JPEG Image|*.jpg|PNG Image|*.png"
-            };
-            if (saveFileDialog.ShowDialog() == DialogResult.OK)
-            {
-                modifiedGrayImage.Save(saveFileDialog.FileName);
-                MessageBox.Show("Colored image saved successfully.");
-            }
-        }
+    // Prompt the user to enter the filename
+    string fileName = PromptForFileName();
 
+    if (string.IsNullOrEmpty(fileName))
+    {
+        MessageBox.Show("Filename cannot be empty.");
+        return;
+    }
+
+    // Specify the path where you want to save the image
+    string savePath = Path.Combine("D://newtest/", fileName + ".jpg");
+
+    modifiedGrayImage.Save(savePath);
+    MessageBox.Show("Colored image saved successfully at: " + savePath);
+}
+
+private string PromptForFileName()
+{
+    string fileName = Interaction.InputBox("Enter the filename for the modified image (without extension):", "Enter Filename", "");
+
+    return fileName;
+}
         private void btnSaveText_Click(object sender, EventArgs e)
         {
             if (string.IsNullOrEmpty(txtInput.Text))
@@ -615,17 +667,14 @@ namespace MyWinFormsApp
                 return;
             }
 
-            SaveFileDialog saveFileDialog = new SaveFileDialog
-            {
-                Filter = "Text File|*.txt"
-            };
+            // Specify the path where you want to save the text file
+            string savePath = @"C:\Your\Specific\Path\TextAnnotation.txt";
 
-            if (saveFileDialog.ShowDialog() == DialogResult.OK)
-            {
-                File.WriteAllText(saveFileDialog.FileName, txtInput.Text);
-                MessageBox.Show("Text saved successfully.");
-            }
+            File.WriteAllText(savePath, txtInput.Text);
+            MessageBox.Show("Text saved successfully at: " + savePath);
         }
+
+
         private void btnRecordAudio_Click(object sender, EventArgs e)
         {
             // StartRecording();
