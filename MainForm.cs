@@ -6,6 +6,8 @@ using Emgu.CV;
 using Emgu.CV.CvEnum;
 using System.IO;
 using System.Drawing.Drawing2D;
+using NAudio;
+using NAudio.Wave;
 
 namespace MyWinFormsApp
 {
@@ -43,6 +45,12 @@ namespace MyWinFormsApp
 
         private ColorMap selectedColorMap;
         private Shape selectedShape;
+        // for recording the audio part
+        private Button btnRecordAudio;
+        private WaveIn waveSource;
+        private WaveFileWriter waveFileWriter;
+        private string audioFilePath;
+        // end of the audio part
 
         public MainForm()
         {
@@ -139,6 +147,9 @@ namespace MyWinFormsApp
             ToolTip btnIdentifyAreaToolTip = new ToolTip();
             btnIdentifyAreaToolTip.SetToolTip(btnIdentifyArea, "Apply color map to the selected region.");
 
+
+
+
             flowPanel.Controls.Add(btnBrowse);
             flowPanel.Controls.Add(btnSave);
             flowPanel.Controls.Add(lblColorMap);
@@ -201,7 +212,18 @@ namespace MyWinFormsApp
             btnSaveText.Click += btnSaveText_Click;
             ToolTip btnSaveTextToolTip = new ToolTip();
             btnSaveTextToolTip.SetToolTip(btnSaveText, "Add a text annotation to the image.");
-
+            // the audio part again 😀
+            btnRecordAudio = new Button
+            {
+                AutoSize = true,
+                Text = "Record Audio",
+                Margin = new Padding(10)
+            };
+            btnRecordAudio.Click += btnRecordAudio_Click;
+            ToolTip btnRecordAudioToolTip = new ToolTip();
+            btnRecordAudioToolTip.SetToolTip(btnRecordAudio, "Record 10 seconds of audio.");
+            textPanel.Controls.Add(btnRecordAudio);
+            // the end of audio part again 🙃
             textPanel.Controls.Add(lblTextInput);
             textPanel.Controls.Add(txtInput);
             textPanel.Controls.Add(btnSaveText);
@@ -604,5 +626,40 @@ namespace MyWinFormsApp
                 MessageBox.Show("Text saved successfully.");
             }
         }
+        private void btnRecordAudio_Click(object sender, EventArgs e)
+        {
+            // StartRecording();
+            RecordAudio2("D://newtest/");
+        }
+        static void RecordAudio2(string outputAudioFile)
+        {
+            using (var waveIn = new WaveInEvent())
+            {
+                waveIn.WaveFormat = new WaveFormat(44100, 1);
+                WaveFileWriter waveFileWriter = null;
+                waveIn.DataAvailable += (sender, e) =>
+                {
+                    if (waveFileWriter == null)
+                    {
+                        waveFileWriter = new WaveFileWriter(outputAudioFile + "Rec.wav", waveIn.WaveFormat);
+                    }
+                    waveFileWriter.Write(e.Buffer, 0, e.BytesRecorded);
+                };
+
+
+                waveIn.StartRecording();
+                Console.WriteLine("Recording for 10 seconds...");
+                MessageBox.Show("Recording started. Please speak for 10 seconds.");
+                Task.Delay(10000).Wait();
+                waveIn.StopRecording();
+
+
+                waveFileWriter?.Dispose();
+                Console.WriteLine("Recording stopped. Audio saved to: " + outputAudioFile);
+                MessageBox.Show("Recording stopped. Audio saved to: " + outputAudioFile);
+
+            }
+        }
+
     }
 }
