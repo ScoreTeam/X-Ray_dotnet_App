@@ -20,7 +20,7 @@ namespace MyWinFormsApp
 {
     public partial class MainForm : Form
     {
-        
+
         private Bitmap originalImage;
         private Bitmap grayImage;
         private Bitmap modifiedGrayImage;
@@ -36,6 +36,8 @@ namespace MyWinFormsApp
         private ComboBox cmbShape;
         private TextBox txtInput;
         private Button btnSaveText;
+        private Button reportbutton;
+        String displayedimage;
         private enum ColorMap
         {
             Rainbow,
@@ -67,12 +69,13 @@ namespace MyWinFormsApp
         public Button Comparebutton;
 
         private Button enhanceButton;
+        private Button generateReportButton;
 
         public MainForm()
         {
             InitializeComponent();
-            this.WindowState = FormWindowState.Maximized; 
-            this.StartPosition = FormStartPosition.CenterScreen; 
+            this.WindowState = FormWindowState.Maximized;
+            this.StartPosition = FormStartPosition.CenterScreen;
         }
 
         private void InitializeComponent()
@@ -204,6 +207,15 @@ namespace MyWinFormsApp
             ToolTip Compare = new ToolTip();
             Compare.SetToolTip(Comparebutton, "Compare two pictures");
 
+            generateReportButton = new Button{
+                Text = "Report button",
+               AutoSize = true,
+               Margin = new Padding(10)
+            };
+            generateReportButton.Text = "Generate Report";
+            generateReportButton.Click += GenerateReportButton_Click;
+            flowPanel.Controls.Add(generateReportButton);
+
             flowPanel.Controls.Add(btnBrowse);
             flowPanel.Controls.Add(btnSave);
             flowPanel.Controls.Add(lblColorMap);
@@ -322,6 +334,7 @@ namespace MyWinFormsApp
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
                 LoadImage(openFileDialog.FileName);
+                displayedimage = openFileDialog.FileName;
             }
         }
 
@@ -340,8 +353,8 @@ namespace MyWinFormsApp
                     g.DrawImage(grayscale.ToBitmap(), new Rectangle(0, 0, grayscale.Width, grayscale.Height));
                 }
 
-                pictureBoxOriginal.Image = modifiedGrayImage;
                 grayImage = new Bitmap(grayscale.Width, grayscale.Height, PixelFormat.Format24bppRgb);
+                pictureBoxOriginal.Image = modifiedGrayImage;
                 using (Graphics g = Graphics.FromImage(grayImage))
                 {
                     g.DrawImage(grayscale.ToBitmap(), new Rectangle(0, 0, grayscale.Width, grayscale.Height));
@@ -958,6 +971,7 @@ namespace MyWinFormsApp
         {
             PictureBox pictureBox = (PictureBox)sender;
             string imagePath = pictureBox.Tag.ToString();
+            displayedimage = imagePath;
             LoadImage(imagePath);
 
             Form galleryForm = (Form)pictureBox.Parent.Parent;
@@ -1051,6 +1065,63 @@ namespace MyWinFormsApp
             image.Save(savePath);
             MessageBox.Show("Enhanced image saved successfully at: " + savePath);
         }
+        private void GenerateReportButton_Click(object sender, EventArgs e)
+        {
+            using (Form inputForm = new Form())
+            {
+                inputForm.Text = "Enter Patient Information";
+
+                Label nameLabel = new Label() { Text = "Name", Top = 20, Left = 20 };
+                TextBox nameTextBox = new TextBox() { Top = 20, Left = 120 };
+
+                Label ageLabel = new Label() { Text = "Age", Top = 60, Left = 20 };
+                TextBox ageTextBox = new TextBox() { Top = 60, Left = 120 };
+
+                Label genderLabel = new Label() { Text = "Gender", Top = 100, Left = 20 };
+                TextBox genderTextBox = new TextBox() { Top = 100, Left = 120 };
+
+                Label doctorFindings = new Label() { Text = "Doctor Fin ", Top = 140, Left = 20 };
+                TextBox doctorFindingsTextBox = new TextBox() { Top = 140, Left = 120 };
+
+                Label doctorRec = new Label() { Text = "Doctor Rec", Top = 180, Left = 20 };
+                TextBox doctorRecTextBox = new TextBox() { Top = 180, Left = 120 };
+
+                Button submitButton = new Button() { Text = "Submit", Top = 220, Left = 100 };
+                submitButton.Click += (s, eArgs) =>
+                {
+                    // Collect input values
+                    string name = nameTextBox.Text;
+                    string age = ageTextBox.Text;
+                    string gender = genderTextBox.Text;
+                    string mainImagePath = displayedimage;
+                    string df=doctorFindingsTextBox.Text;
+                    string dr=doctorRecTextBox.Text;
+
+
+
+                    // Generate the report
+                    Report.GenerateMedicalReport(name, age, gender, mainImagePath, "referredDoctorImagePath",df,dr);
+
+                    MessageBox.Show("Medical report generated successfully.");
+                    inputForm.Close();
+                };
+
+                inputForm.Controls.Add(nameLabel);
+                inputForm.Controls.Add(nameTextBox);
+                inputForm.Controls.Add(ageLabel);
+                inputForm.Controls.Add(ageTextBox);
+                inputForm.Controls.Add(genderLabel);
+                inputForm.Controls.Add(genderTextBox);
+                inputForm.Controls.Add(doctorFindings);
+                inputForm.Controls.Add(doctorFindingsTextBox);
+                inputForm.Controls.Add(doctorRec);
+                inputForm.Controls.Add(doctorRecTextBox);
+                inputForm.Controls.Add(submitButton);
+
+                inputForm.ShowDialog();
+            }
+        }
+
     }
 }
 
