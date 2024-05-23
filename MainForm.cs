@@ -8,11 +8,19 @@ using System.IO;
 using System.Drawing.Drawing2D;
 using NAudio;
 using NAudio.Wave;
+using Microsoft.VisualBasic;
+using AForge.Imaging;
+using AForge.Imaging.Filters;
+using AForge.Imaging.ComplexFilters;
+using AForge;
+using Point = System.Drawing.Point;
+using AForge.Math;
 
 namespace MyWinFormsApp
 {
     public partial class MainForm : Form
     {
+        
         private Bitmap originalImage;
         private Bitmap grayImage;
         private Bitmap modifiedGrayImage;
@@ -21,7 +29,7 @@ namespace MyWinFormsApp
         private Button btnIdentifyArea;
         private PictureBox pictureBoxOriginal;
         private Button btnSave;
-        private Point startPoint;
+        private System.Drawing.Point startPoint;
         private Point endPoint;
         private bool isDrawing = false;
         private ComboBox cmbColorMap;
@@ -45,16 +53,26 @@ namespace MyWinFormsApp
 
         private ColorMap selectedColorMap;
         private Shape selectedShape;
-        // for recording the audio part
+        // for recording the audio part (some of those are not used i will delete them later)
         private Button btnRecordAudio;
         private WaveIn waveSource;
         private WaveFileWriter waveFileWriter;
         private string audioFilePath;
         // end of the audio part
+        Button btnGallery;
+        private double totalArea = 0;
+        private Button checkConditionButton;
+        private PictureBox pictureBoxEnhanced;
+
+        public Button Comparebutton;
+
+        private Button enhanceButton;
 
         public MainForm()
         {
             InitializeComponent();
+            this.WindowState = FormWindowState.Maximized; 
+            this.StartPosition = FormStartPosition.CenterScreen; 
         }
 
         private void InitializeComponent()
@@ -146,9 +164,45 @@ namespace MyWinFormsApp
             btnIdentifyArea.Click += btnIdentifyArea_Click;
             ToolTip btnIdentifyAreaToolTip = new ToolTip();
             btnIdentifyAreaToolTip.SetToolTip(btnIdentifyArea, "Apply color map to the selected region.");
+            // checking the condition 
+            checkConditionButton = new Button
+            {
+                Text = "Check Condition",
+                // Dock = DockStyle.Top,
+                AutoSize = true,
+                Margin = new Padding(10)
 
+            };
+            checkConditionButton.Click += CheckConditionButton_Click;
+            enhanceButton = new Button
+            {
+                Text = "Enhance Image",
+                AutoSize = true,
+                Margin = new Padding(10)
+            };
+            enhanceButton.Click += (sender, e) =>
+            {
+                ProcessImage();
+            };
+            ToolTip enhanceButtonToolTip = new ToolTip();
+            enhanceButtonToolTip.SetToolTip(enhanceButton, "Enhance the image using Fourier transformation.");
 
+            flowPanel.Controls.Add(enhanceButton);
 
+            pictureBoxEnhanced = new PictureBox
+            {
+                SizeMode = PictureBoxSizeMode.AutoSize,
+                Margin = new Padding(10)
+            };
+            Comparebutton = new Button
+            {
+                AutoSize = true,
+                Text = "Compare",
+                Margin = new Padding(10)
+            };
+            Comparebutton.Click += Comparebutton_click;
+            ToolTip Compare = new ToolTip();
+            Compare.SetToolTip(Comparebutton, "Compare two pictures");
 
             flowPanel.Controls.Add(btnBrowse);
             flowPanel.Controls.Add(btnSave);
@@ -158,6 +212,10 @@ namespace MyWinFormsApp
             flowPanel.Controls.Add(cmbShape);
             flowPanel.Controls.Add(btnCrop);
             flowPanel.Controls.Add(btnIdentifyArea);
+            flowPanel.Controls.Add(checkConditionButton);
+            flowPanel.Controls.Add(Comparebutton);
+
+
 
             Panel imagePanel = new Panel
             {
@@ -231,6 +289,27 @@ namespace MyWinFormsApp
             this.Controls.Add(textPanel);
             this.Controls.Add(imagePanel);
             this.Controls.Add(flowPanel);
+            btnGallery = new Button
+            {
+                AutoSize = true,
+                Text = "Gallery",
+                Margin = new Padding(10)
+            };
+            btnGallery.Click += btnGallery_Click;
+            ToolTip btnGalleryToolTip = new ToolTip();
+            btnGalleryToolTip.SetToolTip(btnGallery, "Launch the image gallery.");
+            flowPanel.Controls.Add(btnGallery);
+            imagePanel.Controls.Add(pictureBoxEnhanced);
+
+
+
+
+        }
+
+        private void Comparebutton_click(object? sender, EventArgs e)
+        {
+            ComparePictures page2Form = new ComparePictures();
+            page2Form.ShowDialog(); // Show as a modal dialog
         }
 
         private void btnBrowse_Click(object sender, EventArgs e)
@@ -242,25 +321,30 @@ namespace MyWinFormsApp
 
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
-                originalImage = new Bitmap(openFileDialog.FileName);
+                LoadImage(openFileDialog.FileName);
+            }
+        }
 
-                using (Mat imagetest = CvInvoke.Imread(openFileDialog.FileName, ImreadModes.AnyColor))
+        private void LoadImage(string filePath)
+        {
+            originalImage = new Bitmap(filePath);
+
+            using (Mat imagetest = CvInvoke.Imread(filePath, ImreadModes.AnyColor))
+            {
+                Mat grayscale = new Mat();
+                CvInvoke.CvtColor(imagetest, grayscale, ColorConversion.Bgr2Gray);
+
+                modifiedGrayImage = new Bitmap(grayscale.Width, grayscale.Height, PixelFormat.Format24bppRgb);
+                using (Graphics g = Graphics.FromImage(modifiedGrayImage))
                 {
-                    Mat grayscale = new Mat();
-                    CvInvoke.CvtColor(imagetest, grayscale, ColorConversion.Bgr2Gray);
+                    g.DrawImage(grayscale.ToBitmap(), new Rectangle(0, 0, grayscale.Width, grayscale.Height));
+                }
 
-                    modifiedGrayImage = new Bitmap(grayscale.Width, grayscale.Height, PixelFormat.Format24bppRgb);
-                    using (Graphics g = Graphics.FromImage(modifiedGrayImage))
-                    {
-                        g.DrawImage(grayscale.ToBitmap(), new Rectangle(0, 0, grayscale.Width, grayscale.Height));
-                    }
-
-                    pictureBoxOriginal.Image = modifiedGrayImage;
-                    grayImage = new Bitmap(grayscale.Width, grayscale.Height, PixelFormat.Format24bppRgb);
-                    using (Graphics g = Graphics.FromImage(grayImage))
-                    {
-                        g.DrawImage(grayscale.ToBitmap(), new Rectangle(0, 0, grayscale.Width, grayscale.Height));
-                    }
+                pictureBoxOriginal.Image = modifiedGrayImage;
+                grayImage = new Bitmap(grayscale.Width, grayscale.Height, PixelFormat.Format24bppRgb);
+                using (Graphics g = Graphics.FromImage(grayImage))
+                {
+                    g.DrawImage(grayscale.ToBitmap(), new Rectangle(0, 0, grayscale.Width, grayscale.Height));
                 }
             }
         }
@@ -285,6 +369,8 @@ namespace MyWinFormsApp
             isDrawing = false;
             endPoint = e.Location;
         }
+
+
 
         private void pictureBoxOriginal_Paint(object sender, PaintEventArgs e)
         {
@@ -371,7 +457,7 @@ namespace MyWinFormsApp
         private void ColorArea_Circle(Rectangle boundingBox, ColorMap colorMap)
         {
             int radius = boundingBox.Width / 2;
-            Point center = new Point(boundingBox.X + radius, boundingBox.Y + radius);
+            System.Drawing.Point center = new System.Drawing.Point(boundingBox.X + radius, boundingBox.Y + radius);
 
             for (int x = boundingBox.Left; x < boundingBox.Right; x++)
             {
@@ -395,7 +481,7 @@ namespace MyWinFormsApp
             }
         }
 
-        private void ColorArea_Triangle(Point[] triangle, ColorMap colorMap)
+        private void ColorArea_Triangle(System.Drawing.Point[] triangle, ColorMap colorMap)
         {
             using (GraphicsPath path = new GraphicsPath())
             {
@@ -508,7 +594,7 @@ namespace MyWinFormsApp
                 return;
             }
 
-            if (startPoint == Point.Empty || endPoint == Point.Empty)
+            if (startPoint == System.Drawing.Point.Empty || endPoint == System.Drawing.Point.Empty)
             {
                 MessageBox.Show("Please select a region to identify and color.");
                 return;
@@ -527,8 +613,8 @@ namespace MyWinFormsApp
                     break;
             }
 
-            startPoint = Point.Empty;
-            endPoint = Point.Empty;
+            startPoint = System.Drawing.Point.Empty;
+            endPoint = System.Drawing.Point.Empty;
         }
 
         private void IdentifyAndColorRectangle()
@@ -536,6 +622,20 @@ namespace MyWinFormsApp
             Rectangle rect = GetRectangle(startPoint, endPoint);
             ColorArea(rect, selectedColorMap);
             pictureBoxOriginal.Invalidate();
+
+            // delete later 
+            // Calculate the size of the rectangle
+            int width = rect.Width;
+            int height = rect.Height;
+            int area = width * height;
+
+            // Print out the result
+            Console.WriteLine("Rectangle Size:");
+            Console.WriteLine("Width: " + width);
+            Console.WriteLine("Height: " + height);
+            Console.WriteLine("Area: " + area);
+            totalArea += area;
+
         }
 
         private void IdentifyAndColorCircle()
@@ -543,13 +643,39 @@ namespace MyWinFormsApp
             Rectangle boundingBox = GetCircleBoundingBox(startPoint, endPoint);
             ColorArea_Circle(boundingBox, selectedColorMap);
             pictureBoxOriginal.Invalidate();
+
+            // Calculate the size of the circle
+            int diameter = Math.Min(boundingBox.Width, boundingBox.Height);
+            double radius = diameter / 2.0;
+            double area = Math.PI * Math.Pow(radius, 2);
+
+            // Print out the result
+            Console.WriteLine("Circle Size:");
+            Console.WriteLine("Diameter: " + diameter);
+            Console.WriteLine("Radius: " + radius);
+            Console.WriteLine("Area: " + area);
+            totalArea += area;
         }
 
         private void IdentifyAndColorTriangle()
         {
-            Point[] triangle = GetTrianglePoints(startPoint, endPoint);
+            System.Drawing.Point[] triangle = GetTrianglePoints(startPoint, endPoint);
             ColorArea_Triangle(triangle, selectedColorMap);
             pictureBoxOriginal.Invalidate();
+
+            // size (delete later )
+            // Calculate the size of the triangle
+            double baseLength = Math.Abs(triangle[2].X - triangle[0].X);
+            double height = Math.Abs(triangle[1].Y - triangle[0].Y);
+            double area = (baseLength * height) / 2.0;
+
+            // Print out the result
+            Console.WriteLine("Triangle Size:");
+            Console.WriteLine("Base Length: " + baseLength);
+            Console.WriteLine("Height: " + height);
+            Console.WriteLine("Area: " + area);
+            totalArea += area;
+
         }
 
         private void btnCrop_Click(object sender, EventArgs e)
@@ -560,7 +686,7 @@ namespace MyWinFormsApp
                 return;
             }
 
-            if (startPoint == Point.Empty || endPoint == Point.Empty)
+            if (startPoint == System.Drawing.Point.Empty || endPoint == System.Drawing.Point.Empty)
             {
                 MessageBox.Show("Please select a region to crop.");
                 return;
@@ -573,8 +699,8 @@ namespace MyWinFormsApp
 
             pictureBoxOriginal.Image = modifiedGrayImage;
 
-            startPoint = Point.Empty;
-            endPoint = Point.Empty;
+            startPoint = System.Drawing.Point.Empty;
+            endPoint = System.Drawing.Point.Empty;
         }
 
         private Bitmap CropImage(Bitmap source, Rectangle cropRect)
@@ -588,6 +714,45 @@ namespace MyWinFormsApp
             return croppedImage;
         }
 
+        // private void btnSave_Click(object sender, EventArgs e)
+        // {
+        //     if (modifiedGrayImage == null)
+        //     {
+        //         MessageBox.Show("No colored image to save.");
+        //         return;
+        //     }
+
+        //     SaveFileDialog saveFileDialog = new SaveFileDialog
+        //     {
+        //         Filter = "JPEG Image|*.jpg|PNG Image|*.png"
+        //     };
+        //     if (saveFileDialog.ShowDialog() == DialogResult.OK)
+        //     {
+        //         modifiedGrayImage.Save(saveFileDialog.FileName);
+        //         MessageBox.Show("Colored image saved successfully.");
+        //     }
+        // }
+
+
+        // private void btnSaveText_Click(object sender, EventArgs e)
+        // {
+        //     if (string.IsNullOrEmpty(txtInput.Text))
+        //     {
+        //         MessageBox.Show("Please enter text to save.");
+        //         return;
+        //     }
+
+        //     SaveFileDialog saveFileDialog = new SaveFileDialog
+        //     {
+        //         Filter = "Text File|*.txt"
+        //     };
+
+        //     if (saveFileDialog.ShowDialog() == DialogResult.OK)
+        //     {
+        //         File.WriteAllText(saveFileDialog.FileName, txtInput.Text);
+        //         MessageBox.Show("Text saved successfully.");
+        //     }
+        // }
         private void btnSave_Click(object sender, EventArgs e)
         {
             if (modifiedGrayImage == null)
@@ -596,17 +761,28 @@ namespace MyWinFormsApp
                 return;
             }
 
-            SaveFileDialog saveFileDialog = new SaveFileDialog
+            // Prompt the user to enter the filename
+            string fileName = PromptForFileName();
+
+            if (string.IsNullOrEmpty(fileName))
             {
-                Filter = "JPEG Image|*.jpg|PNG Image|*.png"
-            };
-            if (saveFileDialog.ShowDialog() == DialogResult.OK)
-            {
-                modifiedGrayImage.Save(saveFileDialog.FileName);
-                MessageBox.Show("Colored image saved successfully.");
+                MessageBox.Show("Filename cannot be empty.");
+                return;
             }
+
+            // Specify the path where you want to save the image
+            string savePath = Path.Combine("D://newtest/", fileName + ".jpg");
+
+            modifiedGrayImage.Save(savePath);
+            MessageBox.Show("Colored image saved successfully at: " + savePath);
         }
 
+        private string PromptForFileName()
+        {
+            string fileName = Interaction.InputBox("Enter the filename for the modified image (without extension):", "Enter Filename", "");
+
+            return fileName;
+        }
         private void btnSaveText_Click(object sender, EventArgs e)
         {
             if (string.IsNullOrEmpty(txtInput.Text))
@@ -615,17 +791,14 @@ namespace MyWinFormsApp
                 return;
             }
 
-            SaveFileDialog saveFileDialog = new SaveFileDialog
-            {
-                Filter = "Text File|*.txt"
-            };
+            // Specify the path where you want to save the text file
+            string savePath = @"C:\Your\Specific\Path\TextAnnotation.txt";
 
-            if (saveFileDialog.ShowDialog() == DialogResult.OK)
-            {
-                File.WriteAllText(saveFileDialog.FileName, txtInput.Text);
-                MessageBox.Show("Text saved successfully.");
-            }
+            File.WriteAllText(savePath, txtInput.Text);
+            MessageBox.Show("Text saved successfully at: " + savePath);
         }
+
+
         private void btnRecordAudio_Click(object sender, EventArgs e)
         {
             // StartRecording();
@@ -661,5 +834,224 @@ namespace MyWinFormsApp
             }
         }
 
+        private void btnGallery_Click(object sender, EventArgs e)
+        {
+            // Create a new form for the gallery
+            Form galleryForm = new Form
+            {
+                Text = "Image Gallery",
+                Width = 800,
+                Height = 600
+            };
+
+            // Create a flow layout panel to hold the images
+            FlowLayoutPanel galleryPanel = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                AutoScroll = true,
+                Padding = new Padding(10)
+            };
+
+            // Create the switch button
+            Button switchButton = new Button
+            {
+                Text = "Switch Sorting",
+                Dock = DockStyle.Top,
+                Size = new Size(30, 30),
+
+            };
+
+            // Create the label to display the current sorting option
+            Label sortingLabel = new Label
+            {
+                Text = "Sorting by: Size",
+                Dock = DockStyle.Top,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = new Font(FontFamily.GenericSansSerif, 12, FontStyle.Bold)
+            };
+
+            // Sort images based on the selected option (size or last modified date)
+            List<string> sortedImages;
+            bool sortBySize = true; // Set to true for sorting by size, false for sorting by last modified date
+
+            void SwitchSorting()
+            {
+                sortBySize = !sortBySize;
+                if (sortBySize)
+                {
+                    sortingLabel.Text = "Sorting by: Size";
+                    sortedImages = GetSortedImages();
+                }
+                else
+                {
+                    sortingLabel.Text = "Sorting by: Last Modified";
+                    sortedImages = GetSortedImagesLastModified();
+                }
+
+                // Clear existing images in the gallery panel
+                galleryPanel.Controls.Clear();
+
+                // Load and display the sorted images in the gallery panel
+                foreach (string imagePath in sortedImages)
+                {
+                    PictureBox pictureBox = new PictureBox
+                    {
+                        Image = System.Drawing.Image.FromFile(imagePath),
+                        SizeMode = PictureBoxSizeMode.AutoSize,
+                        Margin = new Padding(10),
+                        Tag = imagePath  // Store the image path in the Tag property
+                    };
+
+                    pictureBox.Click += PictureBox_Click;  // Assign the event handler
+                    galleryPanel.Controls.Add(pictureBox);
+                }
+            }
+
+            // switchButton.Click += (s, ev) => SwitchSorting(); // Assign the event handler for the switch button
+            switchButton.Click += (s, ev) => SwitchSorting();
+
+            galleryForm.Controls.Add(switchButton);
+            galleryForm.Controls.Add(sortingLabel);
+            galleryForm.Controls.Add(galleryPanel);
+
+            // Show the gallery form
+            galleryForm.ShowDialog();
+        }
+        private List<string> GetSortedImagesLastModified()
+        {
+            string directoryPath = "D://newtest";
+            string[] imageFiles = Directory.GetFiles(directoryPath, "*.jpg", SearchOption.AllDirectories)
+                .Concat(Directory.GetFiles(directoryPath, "*.png", SearchOption.AllDirectories))
+                .ToArray();
+
+            // Sort the image files by last modified date in descending order
+            Array.Sort(imageFiles, (a, b) =>
+            {
+                FileInfo fileInfoA = new FileInfo(a);
+                FileInfo fileInfoB = new FileInfo(b);
+                return fileInfoB.LastWriteTime.CompareTo(fileInfoA.LastWriteTime); // Compare in reverse order
+            });
+
+            // Convert the array to a list and return
+            return new List<string>(imageFiles);
+        }
+        private List<string> GetSortedImages()
+        {
+            string directoryPath = "D://newtest"; // Replace with your actual directory path
+                                                  // string[] imageFiles = Directory.GetFiles(directoryPath, "*.jpg"); // Change the file extension as needed
+            string[] imageFiles = Directory.GetFiles(directoryPath, "*.jpg", SearchOption.AllDirectories)
+            .Concat(Directory.GetFiles(directoryPath, "*.png", SearchOption.AllDirectories))
+            .ToArray();
+
+            // Sort the image files by size in ascending order
+            Array.Sort(imageFiles, (a, b) =>
+            {
+                FileInfo fileInfoA = new FileInfo(a);
+                FileInfo fileInfoB = new FileInfo(b);
+                return fileInfoA.Length.CompareTo(fileInfoB.Length);
+            });
+
+            // Convert the array to a list and return
+            return new List<string>(imageFiles);
+        }
+        private void PictureBox_Click(object sender, EventArgs e)
+        {
+            PictureBox pictureBox = (PictureBox)sender;
+            string imagePath = pictureBox.Tag.ToString();
+            LoadImage(imagePath);
+
+            Form galleryForm = (Form)pictureBox.Parent.Parent;
+            galleryForm.Close();
+        }
+
+        private void CheckConditionButton_Click(object sender, EventArgs e)
+        {
+            string condition;
+
+            if (totalArea >= 0 && totalArea <= 70000)
+            {
+                condition = "Mild";
+            }
+            else if (totalArea > 70000 && totalArea <= 250000)
+            {
+                condition = "Medium";
+            }
+            else
+            {
+                condition = "Severe";
+            }
+
+            string message = "Total Area: " + totalArea + "\nCondition: " + condition;
+            MessageBox.Show(message, "Condition Report", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        private void ProcessImage()
+        {
+            if (pictureBoxOriginal.Image != null)
+            {
+                // Get the original image from the PictureBox
+                Bitmap originalImage = new Bitmap(pictureBoxOriginal.Image);
+                int newWidth = (int)Math.Pow(2, Math.Ceiling(Math.Log(originalImage.Width, 2)));
+                int newHeight = (int)Math.Pow(2, Math.Ceiling(Math.Log(originalImage.Height, 2)));
+                // Resize the image
+                ResizeBilinear resizeFilter = new ResizeBilinear(newWidth, newHeight);
+                Bitmap resizedImage = resizeFilter.Apply(originalImage);
+
+                // Convert the image to grayscale
+                Grayscale grayscaleFilter = new Grayscale(0.2125, 0.7154, 0.0721);
+                Bitmap grayscaleImage = grayscaleFilter.Apply(resizedImage);
+
+                // Apply Fourier transformation
+                ComplexImage complexImage = ComplexImage.FromBitmap(grayscaleImage);
+                complexImage.ForwardFourierTransform();
+
+                // Apply high-pass filter to enhance the image
+                int width = complexImage.Width;
+                int height = complexImage.Height;
+                double cutoff = 0.1; // Adjust this value based on desired enhancement
+
+                for (int u = 0; u < width; u++)
+                {
+                    for (int v = 0; v < height; v++)
+                    {
+                        double distance = Math.Sqrt(Math.Pow(u - width / 2, 2) + Math.Pow(v - height / 2, 2));
+                        if (distance < cutoff * Math.Min(width, height))
+                        {
+                            complexImage.Data[v, u] = new Complex(0, 0);
+                        }
+                    }
+                }
+
+
+                // Apply inverse Fourier transformation
+                complexImage.BackwardFourierTransform();
+
+                // Get the enhanced image
+                Bitmap enhancedImage = complexImage.ToBitmap();
+
+                // Save the enhanced image
+                SaveEnhancedImage(enhancedImage);
+            }
+            else
+            {
+                MessageBox.Show("No image selected.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        private void SaveEnhancedImage(Bitmap image)
+        {
+            string fileName = PromptForFileName();
+
+            if (string.IsNullOrEmpty(fileName))
+            {
+                MessageBox.Show("Filename cannot be empty.");
+                return;
+            }
+
+            string savePath = Path.Combine("D://newtest/", fileName + ".jpg");
+
+            image.Save(savePath);
+            MessageBox.Show("Enhanced image saved successfully at: " + savePath);
+        }
     }
 }
+
+
