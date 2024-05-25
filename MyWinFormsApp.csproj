@@ -11,8 +11,12 @@
   <ItemGroup>
     <PackageReference Include="AForge" Version="2.2.5" />
     <PackageReference Include="AForge.Imaging" Version="2.2.5" />
+    <PackageReference Include="BouncyCastle" Version="1.8.9" />
     <PackageReference Include="Emgu.CV" Version="4.9.0.5494" />
     <PackageReference Include="Emgu.CV.Bitmap" Version="4.9.0.5494" />
+    <PackageReference Include="itext" Version="8.0.4" />
+    <PackageReference Include="itext7" Version="8.0.4" />
+    <PackageReference Include="itext7.bouncy-castle-adapter" Version="8.0.4" />
     <PackageReference Include="NAudio" Version="2.2.1" />
   </ItemGroup>
 
