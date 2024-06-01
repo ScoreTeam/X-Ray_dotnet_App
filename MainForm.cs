@@ -6,7 +6,6 @@ using NAudio.Wave;
 using Microsoft.VisualBasic;
 using AForge.Imaging;
 using AForge.Imaging.Filters;
-using Point = System.Drawing.Point;
 using AForge.Math;
 using Telegram.Bot;
 using Telegram.Bot.Types.InputFiles;
@@ -473,27 +472,28 @@ namespace MyWinFormsApp
         }
         private void btnSaveText_Click(object sender, EventArgs e)
         {
-            if (string.IsNullOrEmpty(txtInput.Text))
+            string text = txtInput.Text;
+            if (string.IsNullOrWhiteSpace(text))
             {
-                MessageBox.Show("Please enter text to save.");
+                MessageBox.Show("Please enter some text to save.");
                 return;
             }
+            using (Graphics g = Graphics.FromImage(modifiedGrayImage))
+            {
+                using (Font font = new Font("Arial", 16))
+                {
+                    g.DrawString(txtInput.Text, font, Brushes.Yellow, startPoint);
+                }
+            }
 
-            // Specify the path where you want to save the text file
-            string savePath = @"C:\Users\Hamza\Desktop\newtest\TextAnnotation.txt";
-
-            File.WriteAllText(savePath, txtInput.Text);
-            MessageBox.Show("Text saved successfully at: " + savePath);
+            pictureBoxOriginal.Image = modifiedGrayImage;
         }
 
 
         private void btnRecordAudio_Click(object sender, EventArgs e)
         {
             // StartRecording();
-            RecordAudio2("C:\\Users\\Hamza\\Desktop\\newtest");
-        }
-        static void RecordAudio2(string outputAudioFile)
-        {
+            string outputAudioFile = "C:\\Users\\Hamza\\Desktop\\newtest";
             using (var waveIn = new WaveInEvent())
             {
                 waveIn.WaveFormat = new WaveFormat(44100, 1);
