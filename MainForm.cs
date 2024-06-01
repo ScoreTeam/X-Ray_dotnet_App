@@ -21,11 +21,12 @@ namespace MyWinFormsApp
         private TelegramBotClient botClient;
         private string chatId = "1096093478"; //for hamza 
         // private string chatId = "1185312313"; //for noore
-        private enum ColorMap { Rainbow, Jet, Ocean, None }
+        private enum ColorMap { Rainbow, Jet, Ocean, CustomGradient, None }
         private enum Shape { Rectangle, Circle, Triangle }
         private ColorMap selectedColorMap;
         private Shape selectedShape;
         private double totalArea = 0;
+        private Color selectedColor = Color.Yellow;
 
         public MainForm()
         {
@@ -34,6 +35,7 @@ namespace MyWinFormsApp
             this.StartPosition = FormStartPosition.CenterScreen;
             botClient = new TelegramBotClient("7267075155:AAF-UnqhU_M0moogBcP7ICLSY1WBvGhtYR0");
         }
+        
         private void Comparebutton_click(object? sender, EventArgs e)
         {
             ComparePictures page2Form = new ComparePictures();
@@ -94,6 +96,14 @@ namespace MyWinFormsApp
                 }
             }
         }
+        private void btnChooseColor_Click(object sender, EventArgs e)
+        {
+            ColorDialog colorDialog = new ColorDialog();
+            if (colorDialog.ShowDialog() == DialogResult.OK)
+            {
+                selectedColor = colorDialog.Color;
+            }
+        }
 
         private void pictureBoxOriginal_MouseDown(object sender, MouseEventArgs e)
         {
@@ -122,7 +132,7 @@ namespace MyWinFormsApp
         {
             if (isDrawing && startPoint != Point.Empty && endPoint != Point.Empty)
             {
-                Pen p = new Pen(Color.Yellow);
+                Pen p = new Pen(selectedColor);
 
                 switch (selectedShape)
                 {
@@ -264,6 +274,8 @@ namespace MyWinFormsApp
                     return MapBrightnessToColor_Jet(brightness);
                 case ColorMap.Ocean:
                     return MapBrightnessToColor_Ocean(brightness);
+                case ColorMap.CustomGradient: // Handle the new color map
+                    return MapBrightnessToColor_CustomGradient(brightness);
                 default:
                     return Color.FromArgb(brightness, brightness, brightness);
             }
@@ -330,6 +342,14 @@ namespace MyWinFormsApp
                 int green = 128 - (brightness - 192);
                 return Color.FromArgb(127 + green, 255, 255);
             }
+        }
+        private Color MapBrightnessToColor_CustomGradient(int brightness)
+        {
+            double ratio = (double)brightness / 255.0;
+            int r = (int)(selectedColor.R * ratio);
+            int g = (int)(selectedColor.G * ratio);
+            int b = (int)(selectedColor.B * ratio);
+            return Color.FromArgb(r, g, b);
         }
 
         private void btnIdentifyArea_Click(object sender, EventArgs e)
