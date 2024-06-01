@@ -1,311 +1,40 @@
-using System;
-using System.Drawing;
 using System.Drawing.Imaging;
-using System.Windows.Forms;
 using Emgu.CV;
 using Emgu.CV.CvEnum;
-using System.IO;
 using System.Drawing.Drawing2D;
-using NAudio;
 using NAudio.Wave;
 using Microsoft.VisualBasic;
 using AForge.Imaging;
 using AForge.Imaging.Filters;
-using AForge.Imaging.ComplexFilters;
-using AForge;
 using Point = System.Drawing.Point;
 using AForge.Math;
+using Telegram.Bot;
+using Telegram.Bot.Types.InputFiles;
 
 namespace MyWinFormsApp
 {
     public partial class MainForm : Form
     {
-        
-        private Bitmap originalImage;
-        private Bitmap grayImage;
-        private Bitmap modifiedGrayImage;
-        private Button btnBrowse;
-        private Button btnCrop;
-        private Button btnIdentifyArea;
-        private PictureBox pictureBoxOriginal;
-        private Button btnSave;
-        private System.Drawing.Point startPoint;
-        private Point endPoint;
+        private Bitmap originalImage, grayImage, modifiedGrayImage;
+        private Point startPoint, endPoint;
         private bool isDrawing = false;
-        private ComboBox cmbColorMap;
-        private ComboBox cmbShape;
-        private TextBox txtInput;
-        private Button btnSaveText;
-        private enum ColorMap
-        {
-            Rainbow,
-            Jet,
-            Ocean,
-            None,
-        }
-
-        private enum Shape
-        {
-            Rectangle,
-            Circle,
-            Triangle,
-        }
-
+        private ComboBox cmbColorMap, cmbShape;
+        private TelegramBotClient botClient;
+        private string chatId = "1096093478"; //for hamza 
+        // private string chatId = "1185312313"; //for noore
+        private enum ColorMap { Rainbow, Jet, Ocean, None }
+        private enum Shape { Rectangle, Circle, Triangle }
         private ColorMap selectedColorMap;
         private Shape selectedShape;
-        // for recording the audio part (some of those are not used i will delete them later)
-        private Button btnRecordAudio;
-        private WaveIn waveSource;
-        private WaveFileWriter waveFileWriter;
-        private string audioFilePath;
-        // end of the audio part
-        Button btnGallery;
         private double totalArea = 0;
-        private Button checkConditionButton;
-        private PictureBox pictureBoxEnhanced;
-
-        public Button Comparebutton;
-
-        private Button enhanceButton;
 
         public MainForm()
         {
             InitializeComponent();
-            this.WindowState = FormWindowState.Maximized; 
-            this.StartPosition = FormStartPosition.CenterScreen; 
+            this.WindowState = FormWindowState.Maximized;
+            this.StartPosition = FormStartPosition.CenterScreen;
+            botClient = new TelegramBotClient("7267075155:AAF-UnqhU_M0moogBcP7ICLSY1WBvGhtYR0");
         }
-
-        private void InitializeComponent()
-        {
-            this.Text = "Medical Image Editor";
-            this.MinimumSize = new Size(1280, 960);
-
-            FlowLayoutPanel flowPanel = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Top,
-                AutoSize = true,
-                FlowDirection = FlowDirection.LeftToRight
-            };
-
-            btnBrowse = new Button
-            {
-                AutoSize = true,
-                Text = "Browse",
-                Margin = new Padding(10)
-            };
-            btnBrowse.Click += btnBrowse_Click;
-            ToolTip btnBrowseToolTip = new ToolTip();
-            btnBrowseToolTip.SetToolTip(btnBrowse, "Browse and load an image.");
-
-            btnSave = new Button
-            {
-                AutoSize = true,
-                Text = "Save Image",
-                Margin = new Padding(10)
-            };
-            btnSave.Click += btnSave_Click;
-            ToolTip btnSaveToolTip = new ToolTip();
-            btnSaveToolTip.SetToolTip(btnSave, "Save the modified image.");
-
-            Label lblColorMap = new Label
-            {
-                Text = "Select Color Map:",
-                Margin = new Padding(10),
-                TextAlign = ContentAlignment.MiddleCenter,
-                AutoSize = true
-            };
-
-            cmbColorMap = new ComboBox
-            {
-                Width = 120,
-                Margin = new Padding(10)
-            };
-            cmbColorMap.Items.AddRange(Enum.GetNames(typeof(ColorMap)));
-            cmbColorMap.SelectedIndex = 0;
-            cmbColorMap.SelectedIndexChanged += cmbColorMap_SelectedIndexChanged;
-            ToolTip cmbColorMapToolTip = new ToolTip();
-            cmbColorMapToolTip.SetToolTip(cmbColorMap, "Select a color map for the image.");
-
-            Label lblShape = new Label
-            {
-                Text = "Select Shape:",
-                Margin = new Padding(10),
-                TextAlign = ContentAlignment.MiddleCenter,
-                AutoSize = true
-            };
-
-            cmbShape = new ComboBox
-            {
-                Width = 120,
-                Margin = new Padding(10)
-            };
-            cmbShape.Items.AddRange(Enum.GetNames(typeof(Shape)));
-            cmbShape.SelectedIndex = 0;
-            cmbShape.SelectedIndexChanged += cmbShape_SelectedIndexChanged;
-            ToolTip cmbShapeToolTip = new ToolTip();
-            cmbShapeToolTip.SetToolTip(cmbShape, "Select a shape to draw.");
-
-            btnCrop = new Button
-            {
-                AutoSize = true,
-                Text = "Crop",
-                Margin = new Padding(10)
-            };
-            btnCrop.Click += btnCrop_Click;
-            ToolTip btnCropToolTip = new ToolTip();
-            btnCropToolTip.SetToolTip(btnCrop, "Crop the selected region of the image.");
-
-            btnIdentifyArea = new Button
-            {
-                AutoSize = true,
-                Text = "Identify Area",
-                Margin = new Padding(10)
-            };
-            btnIdentifyArea.Click += btnIdentifyArea_Click;
-            ToolTip btnIdentifyAreaToolTip = new ToolTip();
-            btnIdentifyAreaToolTip.SetToolTip(btnIdentifyArea, "Apply color map to the selected region.");
-            // checking the condition 
-            checkConditionButton = new Button
-            {
-                Text = "Check Condition",
-                // Dock = DockStyle.Top,
-                AutoSize = true,
-                Margin = new Padding(10)
-
-            };
-            checkConditionButton.Click += CheckConditionButton_Click;
-            enhanceButton = new Button
-            {
-                Text = "Enhance Image",
-                AutoSize = true,
-                Margin = new Padding(10)
-            };
-            enhanceButton.Click += (sender, e) =>
-            {
-                ProcessImage();
-            };
-            ToolTip enhanceButtonToolTip = new ToolTip();
-            enhanceButtonToolTip.SetToolTip(enhanceButton, "Enhance the image using Fourier transformation.");
-
-            flowPanel.Controls.Add(enhanceButton);
-
-            pictureBoxEnhanced = new PictureBox
-            {
-                SizeMode = PictureBoxSizeMode.AutoSize,
-                Margin = new Padding(10)
-            };
-            Comparebutton = new Button
-            {
-                AutoSize = true,
-                Text = "Compare",
-                Margin = new Padding(10)
-            };
-            Comparebutton.Click += Comparebutton_click;
-            ToolTip Compare = new ToolTip();
-            Compare.SetToolTip(Comparebutton, "Compare two pictures");
-
-            flowPanel.Controls.Add(btnBrowse);
-            flowPanel.Controls.Add(btnSave);
-            flowPanel.Controls.Add(lblColorMap);
-            flowPanel.Controls.Add(cmbColorMap);
-            flowPanel.Controls.Add(lblShape);
-            flowPanel.Controls.Add(cmbShape);
-            flowPanel.Controls.Add(btnCrop);
-            flowPanel.Controls.Add(btnIdentifyArea);
-            flowPanel.Controls.Add(checkConditionButton);
-            flowPanel.Controls.Add(Comparebutton);
-
-
-
-            Panel imagePanel = new Panel
-            {
-                Height = 720,
-                Dock = DockStyle.Top,
-                AutoScroll = true,
-                Padding = new Padding(10),
-            };
-
-            pictureBoxOriginal = new PictureBox
-            {
-                SizeMode = PictureBoxSizeMode.AutoSize,
-                Margin = new Padding(10)
-            };
-            pictureBoxOriginal.MouseDown += pictureBoxOriginal_MouseDown;
-            pictureBoxOriginal.MouseMove += pictureBoxOriginal_MouseMove;
-            pictureBoxOriginal.MouseUp += pictureBoxOriginal_MouseUp;
-            pictureBoxOriginal.Paint += pictureBoxOriginal_Paint;
-
-            imagePanel.Controls.Add(pictureBoxOriginal);
-
-            FlowLayoutPanel textPanel = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                AutoSize = true,
-                FlowDirection = FlowDirection.LeftToRight,
-                Padding = new Padding(10)
-            };
-
-            Label lblTextInput = new Label
-            {
-                Text = "Enter Annotation Text:",
-                Margin = new Padding(10),
-                TextAlign = ContentAlignment.MiddleCenter,
-                AutoSize = true
-            };
-
-            txtInput = new TextBox
-            {
-                Width = 400,
-                Height = 100,
-                Multiline = true,
-                Margin = new Padding(10)
-            };
-
-            btnSaveText = new Button
-            {
-                AutoSize = true,
-                Text = "Save Text",
-                Margin = new Padding(10)
-            };
-            btnSaveText.Click += btnSaveText_Click;
-            ToolTip btnSaveTextToolTip = new ToolTip();
-            btnSaveTextToolTip.SetToolTip(btnSaveText, "Add a text annotation to the image.");
-            // the audio part again 😀
-            btnRecordAudio = new Button
-            {
-                AutoSize = true,
-                Text = "Record Audio",
-                Margin = new Padding(10)
-            };
-            btnRecordAudio.Click += btnRecordAudio_Click;
-            ToolTip btnRecordAudioToolTip = new ToolTip();
-            btnRecordAudioToolTip.SetToolTip(btnRecordAudio, "Record 10 seconds of audio.");
-            textPanel.Controls.Add(btnRecordAudio);
-            // the end of audio part again 🙃
-            textPanel.Controls.Add(lblTextInput);
-            textPanel.Controls.Add(txtInput);
-            textPanel.Controls.Add(btnSaveText);
-
-            this.Controls.Add(textPanel);
-            this.Controls.Add(imagePanel);
-            this.Controls.Add(flowPanel);
-            btnGallery = new Button
-            {
-                AutoSize = true,
-                Text = "Gallery",
-                Margin = new Padding(10)
-            };
-            btnGallery.Click += btnGallery_Click;
-            ToolTip btnGalleryToolTip = new ToolTip();
-            btnGalleryToolTip.SetToolTip(btnGallery, "Launch the image gallery.");
-            flowPanel.Controls.Add(btnGallery);
-            imagePanel.Controls.Add(pictureBoxEnhanced);
-
-
-
-
-        }
-
         private void Comparebutton_click(object? sender, EventArgs e)
         {
             ComparePictures page2Form = new ComparePictures();
@@ -322,6 +51,24 @@ namespace MyWinFormsApp
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
                 LoadImage(openFileDialog.FileName);
+            }
+        }
+        private async void buttonShare_Click(object sender, EventArgs e)
+        {
+            OpenFileDialog openFileDialog = new OpenFileDialog();
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                string filePath = openFileDialog.FileName;
+                await SendFileToTelegram(filePath);
+            }
+        }
+
+        private async Task SendFileToTelegram(string filePath)
+        {
+            using (var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                var fileToSend = new InputOnlineFile(fileStream, Path.GetFileName(filePath));
+                await botClient.SendDocumentAsync(chatId, fileToSend, "Here's your file!");
             }
         }
 
@@ -457,7 +204,7 @@ namespace MyWinFormsApp
         private void ColorArea_Circle(Rectangle boundingBox, ColorMap colorMap)
         {
             int radius = boundingBox.Width / 2;
-            System.Drawing.Point center = new System.Drawing.Point(boundingBox.X + radius, boundingBox.Y + radius);
+            Point center = new Point(boundingBox.X + radius, boundingBox.Y + radius);
 
             for (int x = boundingBox.Left; x < boundingBox.Right; x++)
             {
@@ -481,7 +228,7 @@ namespace MyWinFormsApp
             }
         }
 
-        private void ColorArea_Triangle(System.Drawing.Point[] triangle, ColorMap colorMap)
+        private void ColorArea_Triangle(Point[] triangle, ColorMap colorMap)
         {
             using (GraphicsPath path = new GraphicsPath())
             {
@@ -594,7 +341,7 @@ namespace MyWinFormsApp
                 return;
             }
 
-            if (startPoint == System.Drawing.Point.Empty || endPoint == System.Drawing.Point.Empty)
+            if (startPoint == Point.Empty || endPoint == Point.Empty)
             {
                 MessageBox.Show("Please select a region to identify and color.");
                 return;
@@ -613,8 +360,8 @@ namespace MyWinFormsApp
                     break;
             }
 
-            startPoint = System.Drawing.Point.Empty;
-            endPoint = System.Drawing.Point.Empty;
+            startPoint = Point.Empty;
+            endPoint = Point.Empty;
         }
 
         private void IdentifyAndColorRectangle()
@@ -623,17 +370,7 @@ namespace MyWinFormsApp
             ColorArea(rect, selectedColorMap);
             pictureBoxOriginal.Invalidate();
 
-            // delete later 
-            // Calculate the size of the rectangle
-            int width = rect.Width;
-            int height = rect.Height;
-            int area = width * height;
-
-            // Print out the result
-            Console.WriteLine("Rectangle Size:");
-            Console.WriteLine("Width: " + width);
-            Console.WriteLine("Height: " + height);
-            Console.WriteLine("Area: " + area);
+            int area = rect.Width * rect.Height;
             totalArea += area;
 
         }
@@ -649,17 +386,12 @@ namespace MyWinFormsApp
             double radius = diameter / 2.0;
             double area = Math.PI * Math.Pow(radius, 2);
 
-            // Print out the result
-            Console.WriteLine("Circle Size:");
-            Console.WriteLine("Diameter: " + diameter);
-            Console.WriteLine("Radius: " + radius);
-            Console.WriteLine("Area: " + area);
             totalArea += area;
         }
 
         private void IdentifyAndColorTriangle()
         {
-            System.Drawing.Point[] triangle = GetTrianglePoints(startPoint, endPoint);
+            Point[] triangle = GetTrianglePoints(startPoint, endPoint);
             ColorArea_Triangle(triangle, selectedColorMap);
             pictureBoxOriginal.Invalidate();
 
@@ -669,11 +401,6 @@ namespace MyWinFormsApp
             double height = Math.Abs(triangle[1].Y - triangle[0].Y);
             double area = (baseLength * height) / 2.0;
 
-            // Print out the result
-            Console.WriteLine("Triangle Size:");
-            Console.WriteLine("Base Length: " + baseLength);
-            Console.WriteLine("Height: " + height);
-            Console.WriteLine("Area: " + area);
             totalArea += area;
 
         }
@@ -686,7 +413,7 @@ namespace MyWinFormsApp
                 return;
             }
 
-            if (startPoint == System.Drawing.Point.Empty || endPoint == System.Drawing.Point.Empty)
+            if (startPoint == Point.Empty || endPoint == Point.Empty)
             {
                 MessageBox.Show("Please select a region to crop.");
                 return;
@@ -699,8 +426,8 @@ namespace MyWinFormsApp
 
             pictureBoxOriginal.Image = modifiedGrayImage;
 
-            startPoint = System.Drawing.Point.Empty;
-            endPoint = System.Drawing.Point.Empty;
+            startPoint = Point.Empty;
+            endPoint = Point.Empty;
         }
 
         private Bitmap CropImage(Bitmap source, Rectangle cropRect)
@@ -713,46 +440,6 @@ namespace MyWinFormsApp
             }
             return croppedImage;
         }
-
-        // private void btnSave_Click(object sender, EventArgs e)
-        // {
-        //     if (modifiedGrayImage == null)
-        //     {
-        //         MessageBox.Show("No colored image to save.");
-        //         return;
-        //     }
-
-        //     SaveFileDialog saveFileDialog = new SaveFileDialog
-        //     {
-        //         Filter = "JPEG Image|*.jpg|PNG Image|*.png"
-        //     };
-        //     if (saveFileDialog.ShowDialog() == DialogResult.OK)
-        //     {
-        //         modifiedGrayImage.Save(saveFileDialog.FileName);
-        //         MessageBox.Show("Colored image saved successfully.");
-        //     }
-        // }
-
-
-        // private void btnSaveText_Click(object sender, EventArgs e)
-        // {
-        //     if (string.IsNullOrEmpty(txtInput.Text))
-        //     {
-        //         MessageBox.Show("Please enter text to save.");
-        //         return;
-        //     }
-
-        //     SaveFileDialog saveFileDialog = new SaveFileDialog
-        //     {
-        //         Filter = "Text File|*.txt"
-        //     };
-
-        //     if (saveFileDialog.ShowDialog() == DialogResult.OK)
-        //     {
-        //         File.WriteAllText(saveFileDialog.FileName, txtInput.Text);
-        //         MessageBox.Show("Text saved successfully.");
-        //     }
-        // }
         private void btnSave_Click(object sender, EventArgs e)
         {
             if (modifiedGrayImage == null)
@@ -771,7 +458,8 @@ namespace MyWinFormsApp
             }
 
             // Specify the path where you want to save the image
-            string savePath = Path.Combine("D://newtest/", fileName + ".jpg");
+            string savePath = Path.Combine("C:\\Users\\Hamza\\Desktop\\newtest", fileName + ".jpg");
+
 
             modifiedGrayImage.Save(savePath);
             MessageBox.Show("Colored image saved successfully at: " + savePath);
@@ -792,7 +480,7 @@ namespace MyWinFormsApp
             }
 
             // Specify the path where you want to save the text file
-            string savePath = @"C:\Your\Specific\Path\TextAnnotation.txt";
+            string savePath = @"C:\Users\Hamza\Desktop\newtest\TextAnnotation.txt";
 
             File.WriteAllText(savePath, txtInput.Text);
             MessageBox.Show("Text saved successfully at: " + savePath);
@@ -802,7 +490,7 @@ namespace MyWinFormsApp
         private void btnRecordAudio_Click(object sender, EventArgs e)
         {
             // StartRecording();
-            RecordAudio2("D://newtest/");
+            RecordAudio2("C:\\Users\\Hamza\\Desktop\\newtest");
         }
         static void RecordAudio2(string outputAudioFile)
         {
@@ -919,7 +607,7 @@ namespace MyWinFormsApp
         }
         private List<string> GetSortedImagesLastModified()
         {
-            string directoryPath = "D://newtest";
+            string directoryPath = "C:\\Users\\Hamza\\Desktop\\newtest";
             string[] imageFiles = Directory.GetFiles(directoryPath, "*.jpg", SearchOption.AllDirectories)
                 .Concat(Directory.GetFiles(directoryPath, "*.png", SearchOption.AllDirectories))
                 .ToArray();
@@ -1046,12 +734,10 @@ namespace MyWinFormsApp
                 return;
             }
 
-            string savePath = Path.Combine("D://newtest/", fileName + ".jpg");
+            string savePath = Path.Combine("C:\\Users\\Hamza\\Desktop\\newtest", fileName + ".jpg");
 
             image.Save(savePath);
             MessageBox.Show("Enhanced image saved successfully at: " + savePath);
         }
     }
 }
-
-
