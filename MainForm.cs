@@ -16,6 +16,9 @@ using AForge;
 using Point = System.Drawing.Point;
 using AForge.Math;
 using System.IO.Compression;
+using ImageSizeSearchApp;
+using Emgu.CV.Structure;
+using Emgu.CV.Util;
 
 
 namespace MyWinFormsApp
@@ -39,6 +42,8 @@ namespace MyWinFormsApp
         private TextBox txtInput;
         private Button btnSaveText;
         private Button reportbutton;
+        private int hsv1value = 0;
+        private Mat hsv1;
         String displayedimage;
         private enum ColorMap
 
@@ -73,6 +78,7 @@ namespace MyWinFormsApp
 
         private Button enhanceButton;
         private Button generateReportButton;
+        private Button SearchButton;
         private string folderPath;
 
         public MainForm()
@@ -103,6 +109,16 @@ namespace MyWinFormsApp
             btnBrowse.Click += btnBrowse_Click;
             ToolTip btnBrowseToolTip = new ToolTip();
             btnBrowseToolTip.SetToolTip(btnBrowse, "Browse and load an image.");
+
+            SearchButton = new Button
+            {
+                AutoSize = true,
+                Text = "Search",
+                Margin = new Padding(10)
+            };
+            SearchButton.Click += btnserchClick;
+            ToolTip btnSearch = new ToolTip();
+            btnBrowseToolTip.SetToolTip(SearchButton, "Search for images by size.");
 
             btnSave = new Button
             {
@@ -231,6 +247,7 @@ namespace MyWinFormsApp
             flowPanel.Controls.Add(btnIdentifyArea);
             flowPanel.Controls.Add(checkConditionButton);
             flowPanel.Controls.Add(Comparebutton);
+            flowPanel.Controls.Add(SearchButton);
 
 
 
@@ -323,6 +340,12 @@ namespace MyWinFormsApp
 
         }
 
+        
+        private void btnserchClick(object? sender, EventArgs e)
+        {
+            ImageSizeSearchForm page2Form = new ImageSizeSearchForm();
+            page2Form.ShowDialog(); 
+        }
         private void Comparebutton_click(object? sender, EventArgs e)
         {
             ComparePictures page2Form = new ComparePictures();
@@ -405,6 +428,21 @@ namespace MyWinFormsApp
                 {
                     g.DrawImage(grayscale.ToBitmap(), new Rectangle(0, 0, grayscale.Width, grayscale.Height));
                 }
+                // hsv1value = CalculateSumOfPixelValues(valueChannel);
+                // Convert the original image to HSV using Emgu.CV
+            using (Mat image = CvInvoke.Imread(filePath, ImreadModes.AnyColor))
+            {
+                hsv1 = new Mat();
+                CvInvoke.CvtColor(image, hsv1, ColorConversion.Bgr2Hsv);
+
+                // Extract the value channel from the HSV image
+                VectorOfMat hsvChannels = new VectorOfMat();
+                CvInvoke.Split(hsv1, hsvChannels);
+                Mat valueChannel = hsvChannels[2];
+
+                hsv1value = CalculateSumOfPixelValues(valueChannel);
+                System.Console.WriteLine("Hsv value : "+hsv1value);
+            }
             }
         }
 
@@ -714,6 +752,7 @@ namespace MyWinFormsApp
             Console.WriteLine("Radius: " + radius);
             Console.WriteLine("Area: " + area);
             totalArea += area;
+            System.Console.WriteLine("Total area : "+totalArea);    
         }
 
         private void IdentifyAndColorTriangle()
@@ -930,7 +969,7 @@ namespace MyWinFormsApp
 
                 }
             }
-
+        
             private void btnGallery_Click(object sender, EventArgs e)
             {
                 // Create a new form for the gallery
@@ -1066,11 +1105,11 @@ namespace MyWinFormsApp
             {
                 string condition;
 
-                if (totalArea >= 0 && totalArea <= 70000)
+                if (hsv1value >= 0 && hsv1value <= 21456995)
                 {
                     condition = "Mild";
                 }
-                else if (totalArea > 70000 && totalArea <= 250000)
+                else if (hsv1value > 21456995 && hsv1value <= 126979253)
                 {
                     condition = "Medium";
                 }
@@ -1079,7 +1118,7 @@ namespace MyWinFormsApp
                     condition = "Severe";
                 }
 
-                string message = "Total Area: " + totalArea + "\nCondition: " + condition;
+                string message = "Total Area: " + hsv1value + "\nCondition: " + condition;
                 MessageBox.Show(message, "Condition Report", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             private void ProcessImage()
@@ -1205,8 +1244,25 @@ namespace MyWinFormsApp
                     inputForm.ShowDialog();
                 }
             }
+        private int Test()
+        {
+            return hsv1value;
+        }
+        public static int CalculateSumOfPixelValues(Mat valueChannel)
+        {
+            if (valueChannel == null || valueChannel.IsEmpty)
+            {
+                throw new ArgumentException("Unable to read the value channel from the HSV image");
+            }
+
+            // Calculate the sum of all pixel values
+            MCvScalar sum = CvInvoke.Sum(valueChannel);
+
+            return (int)sum.V0;
+        }
 
         }
+        
     }
 
 
