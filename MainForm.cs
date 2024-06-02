@@ -164,8 +164,8 @@ namespace MyWinFormsApp
                 var fileToSend = new InputOnlineFile(fileStream, Path.GetFileName(filePath));
                 await botClient.SendDocumentAsync(chatId, fileToSend, "Here's your file!");
             }
-            
-                MessageBox.Show("file sent successfully");
+
+            MessageBox.Show("file sent successfully");
         }
         private void btnChooseColor_Click(object sender, EventArgs e)
         {
