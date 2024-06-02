@@ -1,24 +1,19 @@
-using System;
-using System.Drawing;
 using System.Drawing.Imaging;
-using System.Windows.Forms;
 using Emgu.CV;
 using Emgu.CV.CvEnum;
-using System.IO;
 using System.Drawing.Drawing2D;
-using NAudio;
 using NAudio.Wave;
 using Microsoft.VisualBasic;
 using AForge.Imaging;
 using AForge.Imaging.Filters;
-using AForge.Imaging.ComplexFilters;
-using AForge;
 using Point = System.Drawing.Point;
 using AForge.Math;
 using System.IO.Compression;
 using ImageSizeSearchApp;
 using Emgu.CV.Structure;
 using Emgu.CV.Util;
+using Telegram.Bot;
+using Telegram.Bot.Types.InputFiles;
 
 
 namespace MyWinFormsApp
@@ -26,345 +21,48 @@ namespace MyWinFormsApp
     public partial class MainForm : Form
     {
 
-        private Bitmap originalImage;
-        private Bitmap grayImage;
-        private Bitmap modifiedGrayImage;
-        private Button btnBrowse;
-        private Button btnCrop;
-        private Button btnIdentifyArea;
-        private PictureBox pictureBoxOriginal;
-        private Button btnSave;
-        private System.Drawing.Point startPoint;
-        private Point endPoint;
+        private Bitmap originalImage, grayImage, modifiedGrayImage;
+        private Point startPoint, endPoint;
         private bool isDrawing = false;
-        private ComboBox cmbColorMap;
-        private ComboBox cmbShape;
-        private TextBox txtInput;
-        private Button btnSaveText;
-        private Button reportbutton;
-        private int hsv1value = 0;
-        private Mat hsv1;
-        String displayedimage;
-        private enum ColorMap
-
-        {
-            Rainbow,
-            Jet,
-            Ocean,
-            None,
-        }
-
-        private enum Shape
-        {
-            Rectangle,
-            Circle,
-            Triangle,
-        }
-
+        private ComboBox cmbColorMap, cmbShape;
+        private TelegramBotClient botClient;
+        private string chatId = "1096093478"; //for Hamza chat
+        // private string chatId = "1185312313"; //for Noore chat
+        private enum ColorMap { Rainbow, Jet, Ocean, CustomGradient, None }
+        private enum Shape { Rectangle, Circle, Triangle }
         private ColorMap selectedColorMap;
         private Shape selectedShape;
-        // for recording the audio part (some of those are not used i will delete them later)
-        private Button btnRecordAudio;
-        private WaveIn waveSource;
-        private WaveFileWriter waveFileWriter;
-        private string audioFilePath;
-        // end of the audio part
-        Button btnGallery;
         private double totalArea = 0;
-        private Button checkConditionButton;
-        private PictureBox pictureBoxEnhanced;
+        private Color selectedColor = Color.Yellow;
 
-        public Button Comparebutton;
+        private int hsv1value = 0;
+        private Mat hsv1;
+        private String displayedimage;
 
-        private Button enhanceButton;
         private Button generateReportButton;
         private Button SearchButton;
         private string folderPath;
+        private string fPath;
 
         public MainForm()
         {
             InitializeComponent();
             this.WindowState = FormWindowState.Maximized;
             this.StartPosition = FormStartPosition.CenterScreen;
+            botClient = new TelegramBotClient("7267075155:AAF-UnqhU_M0moogBcP7ICLSY1WBvGhtYR0");
         }
 
-        private void InitializeComponent()
-        {
-            this.Text = "Medical Image Editor";
-            this.MinimumSize = new Size(1280, 960);
 
-            FlowLayoutPanel flowPanel = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Top,
-                AutoSize = true,
-                FlowDirection = FlowDirection.LeftToRight
-            };
-
-            btnBrowse = new Button
-            {
-                AutoSize = true,
-                Text = "Browse",
-                Margin = new Padding(10)
-            };
-            btnBrowse.Click += btnBrowse_Click;
-            ToolTip btnBrowseToolTip = new ToolTip();
-            btnBrowseToolTip.SetToolTip(btnBrowse, "Browse and load an image.");
-
-            SearchButton = new Button
-            {
-                AutoSize = true,
-                Text = "Search",
-                Margin = new Padding(10)
-            };
-            SearchButton.Click += btnserchClick;
-            ToolTip btnSearch = new ToolTip();
-            btnBrowseToolTip.SetToolTip(SearchButton, "Search for images by size.");
-
-            btnSave = new Button
-            {
-                AutoSize = true,
-                Text = "Save Image",
-                Margin = new Padding(10)
-            };
-            btnSave.Click += btnSave_Click;
-            ToolTip btnSaveToolTip = new ToolTip();
-            btnSaveToolTip.SetToolTip(btnSave, "Save the modified image.");
-
-            Label lblColorMap = new Label
-            {
-                Text = "Select Color Map:",
-                Margin = new Padding(10),
-                TextAlign = ContentAlignment.MiddleCenter,
-                AutoSize = true
-            };
-
-            cmbColorMap = new ComboBox
-            {
-                Width = 120,
-                Margin = new Padding(10)
-            };
-            cmbColorMap.Items.AddRange(Enum.GetNames(typeof(ColorMap)));
-            cmbColorMap.SelectedIndex = 0;
-            cmbColorMap.SelectedIndexChanged += cmbColorMap_SelectedIndexChanged;
-            ToolTip cmbColorMapToolTip = new ToolTip();
-            cmbColorMapToolTip.SetToolTip(cmbColorMap, "Select a color map for the image.");
-
-            Label lblShape = new Label
-            {
-                Text = "Select Shape:",
-                Margin = new Padding(10),
-                TextAlign = ContentAlignment.MiddleCenter,
-                AutoSize = true
-            };
-
-            cmbShape = new ComboBox
-            {
-                Width = 120,
-                Margin = new Padding(10)
-            };
-            cmbShape.Items.AddRange(Enum.GetNames(typeof(Shape)));
-            cmbShape.SelectedIndex = 0;
-            cmbShape.SelectedIndexChanged += cmbShape_SelectedIndexChanged;
-            ToolTip cmbShapeToolTip = new ToolTip();
-            cmbShapeToolTip.SetToolTip(cmbShape, "Select a shape to draw.");
-
-            btnCrop = new Button
-            {
-                AutoSize = true,
-                Text = "Crop",
-                Margin = new Padding(10)
-            };
-            btnCrop.Click += btnCrop_Click;
-            ToolTip btnCropToolTip = new ToolTip();
-            btnCropToolTip.SetToolTip(btnCrop, "Crop the selected region of the image.");
-
-            btnIdentifyArea = new Button
-            {
-                AutoSize = true,
-                Text = "Identify Area",
-                Margin = new Padding(10)
-            };
-            btnIdentifyArea.Click += btnIdentifyArea_Click;
-            ToolTip btnIdentifyAreaToolTip = new ToolTip();
-            btnIdentifyAreaToolTip.SetToolTip(btnIdentifyArea, "Apply color map to the selected region.");
-            // checking the condition 
-            checkConditionButton = new Button
-            {
-                Text = "Check Condition",
-                // Dock = DockStyle.Top,
-                AutoSize = true,
-                Margin = new Padding(10)
-
-            };
-            checkConditionButton.Click += CheckConditionButton_Click;
-            enhanceButton = new Button
-            {
-                Text = "Enhance Image",
-                AutoSize = true,
-                Margin = new Padding(10)
-            };
-            enhanceButton.Click += (sender, e) =>
-            {
-                ProcessImage();
-            };
-            ToolTip enhanceButtonToolTip = new ToolTip();
-            enhanceButtonToolTip.SetToolTip(enhanceButton, "Enhance the image using Fourier transformation.");
-
-            flowPanel.Controls.Add(enhanceButton);
-
-            pictureBoxEnhanced = new PictureBox
-            {
-                SizeMode = PictureBoxSizeMode.AutoSize,
-                Margin = new Padding(10)
-            };
-            Comparebutton = new Button
-            {
-                AutoSize = true,
-                Text = "Compare",
-                Margin = new Padding(10)
-            };
-            Comparebutton.Click += Comparebutton_click;
-            ToolTip Compare = new ToolTip();
-            Compare.SetToolTip(Comparebutton, "Compare two pictures");
-
-            generateReportButton = new Button
-            {
-                Text = "Report button",
-                AutoSize = true,
-                Margin = new Padding(10)
-            };
-            generateReportButton.Text = "Generate Report";
-            generateReportButton.Click += GenerateReportButton_Click;
-            flowPanel.Controls.Add(generateReportButton);
-
-            flowPanel.Controls.Add(btnBrowse);
-            flowPanel.Controls.Add(btnSave);
-            flowPanel.Controls.Add(lblColorMap);
-            flowPanel.Controls.Add(cmbColorMap);
-            flowPanel.Controls.Add(lblShape);
-            flowPanel.Controls.Add(cmbShape);
-            flowPanel.Controls.Add(btnCrop);
-            flowPanel.Controls.Add(btnIdentifyArea);
-            flowPanel.Controls.Add(checkConditionButton);
-            flowPanel.Controls.Add(Comparebutton);
-            flowPanel.Controls.Add(SearchButton);
-
-
-
-            Panel imagePanel = new Panel
-            {
-                Height = 720,
-                Dock = DockStyle.Top,
-                AutoScroll = true,
-                Padding = new Padding(10),
-            };
-
-            pictureBoxOriginal = new PictureBox
-            {
-                SizeMode = PictureBoxSizeMode.AutoSize,
-                Margin = new Padding(10)
-            };
-            pictureBoxOriginal.MouseDown += pictureBoxOriginal_MouseDown;
-            pictureBoxOriginal.MouseMove += pictureBoxOriginal_MouseMove;
-            pictureBoxOriginal.MouseUp += pictureBoxOriginal_MouseUp;
-            pictureBoxOriginal.Paint += pictureBoxOriginal_Paint;
-
-            imagePanel.Controls.Add(pictureBoxOriginal);
-
-            FlowLayoutPanel textPanel = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                AutoSize = true,
-                FlowDirection = FlowDirection.LeftToRight,
-                Padding = new Padding(10)
-            };
-
-            Label lblTextInput = new Label
-            {
-                Text = "Enter Annotation Text:",
-                Margin = new Padding(10),
-                TextAlign = ContentAlignment.MiddleCenter,
-                AutoSize = true
-            };
-
-            txtInput = new TextBox
-            {
-                Width = 400,
-                Height = 100,
-                Multiline = true,
-                Margin = new Padding(10)
-            };
-
-            btnSaveText = new Button
-            {
-                AutoSize = true,
-                Text = "Save Text",
-                Margin = new Padding(10)
-            };
-            btnSaveText.Click += btnSaveText_Click;
-            ToolTip btnSaveTextToolTip = new ToolTip();
-            btnSaveTextToolTip.SetToolTip(btnSaveText, "Add a text annotation to the image.");
-            // the audio part again 😀
-            btnRecordAudio = new Button
-            {
-                AutoSize = true,
-                Text = "Record Audio",
-                Margin = new Padding(10)
-            };
-            btnRecordAudio.Click += btnRecordAudio_Click;
-            ToolTip btnRecordAudioToolTip = new ToolTip();
-            btnRecordAudioToolTip.SetToolTip(btnRecordAudio, "Record 10 seconds of audio.");
-            textPanel.Controls.Add(btnRecordAudio);
-            // the end of audio part again 🙃
-            textPanel.Controls.Add(lblTextInput);
-            textPanel.Controls.Add(txtInput);
-            textPanel.Controls.Add(btnSaveText);
-
-            this.Controls.Add(textPanel);
-            this.Controls.Add(imagePanel);
-            this.Controls.Add(flowPanel);
-            btnGallery = new Button
-            {
-                AutoSize = true,
-                Text = "Gallery",
-                Margin = new Padding(10)
-            };
-            btnGallery.Click += btnGallery_Click;
-            ToolTip btnGalleryToolTip = new ToolTip();
-            btnGalleryToolTip.SetToolTip(btnGallery, "Launch the image gallery.");
-            flowPanel.Controls.Add(btnGallery);
-            imagePanel.Controls.Add(pictureBoxEnhanced);
-
-
-
-
-        }
-
-        
         private void btnserchClick(object? sender, EventArgs e)
         {
             ImageSizeSearchForm page2Form = new ImageSizeSearchForm();
-            page2Form.ShowDialog(); 
+            page2Form.ShowDialog();
         }
         private void Comparebutton_click(object? sender, EventArgs e)
         {
             ComparePictures page2Form = new ComparePictures();
             page2Form.ShowDialog(); // Show as a modal dialog
         }
-
-        // private void btnBrowse_Click(object sender, EventArgs e)
-        // {
-        //     OpenFileDialog openFileDialog = new OpenFileDialog
-        //     {
-        //         Filter = "Image Files|*.bmp;*.jpg;*.jpeg;*.png;*.gif;*.tif;*.tiff"
-        //     };
-
-        //     if (openFileDialog.ShowDialog() == DialogResult.OK)
-        //     {
-        //         LoadImage(openFileDialog.FileName);
-        //         displayedimage = openFileDialog.FileName;
-        //     }
-        // }
         private void btnBrowse_Click(object sender, EventArgs e)
         {
             OpenFileDialog openFileDialog = new OpenFileDialog
@@ -380,10 +78,8 @@ namespace MyWinFormsApp
                 // Create a folder with image name and current date
                 string imageName = Path.GetFileNameWithoutExtension(openFileDialog.FileName);
                 string currentDate = DateTime.Now.ToString("yyyyMMdd");
-                // folderPath = Path.Combine("D://newtest/", $"{imageName}_{currentDate}");
-                // Directory.CreateDirectory(folderPath);
                 // Specify the base path for the new folder
-                string basePath = $"D://newtest/{imageName}_-_{currentDate}";
+                string basePath = $"C://newtest/{imageName}_-_{currentDate}";
                 folderPath = basePath;
 
                 // Check if the folder already exists
@@ -430,19 +126,53 @@ namespace MyWinFormsApp
                 }
                 // hsv1value = CalculateSumOfPixelValues(valueChannel);
                 // Convert the original image to HSV using Emgu.CV
-            using (Mat image = CvInvoke.Imread(filePath, ImreadModes.AnyColor))
-            {
-                hsv1 = new Mat();
-                CvInvoke.CvtColor(image, hsv1, ColorConversion.Bgr2Hsv);
+                using (Mat image = CvInvoke.Imread(filePath, ImreadModes.AnyColor))
+                {
+                    hsv1 = new Mat();
+                    CvInvoke.CvtColor(image, hsv1, ColorConversion.Bgr2Hsv);
 
-                // Extract the value channel from the HSV image
-                VectorOfMat hsvChannels = new VectorOfMat();
-                CvInvoke.Split(hsv1, hsvChannels);
-                Mat valueChannel = hsvChannels[2];
+                    // Extract the value channel from the HSV image
+                    VectorOfMat hsvChannels = new VectorOfMat();
+                    CvInvoke.Split(hsv1, hsvChannels);
+                    Mat valueChannel = hsvChannels[2];
 
-                hsv1value = CalculateSumOfPixelValues(valueChannel);
-                System.Console.WriteLine("Hsv value : "+hsv1value);
+                    hsv1value = CalculateSumOfPixelValues(valueChannel);
+                    System.Console.WriteLine("Hsv value : " + hsv1value);
+                }
             }
+        }
+
+        private async void buttonShare_Click(object sender, EventArgs e)
+        {
+
+            btnSave_Click(this, EventArgs.Empty);
+            // OpenFileDialog openFileDialog = new OpenFileDialog();
+            // if (openFileDialog.ShowDialog() == DialogResult.OK)
+            // {
+            // string filePath = openFileDialog.FileName;
+            if (fPath != null)
+            {
+                await SendFileToTelegram(fPath);
+            }
+            // }
+        }
+
+        private async Task SendFileToTelegram(string filePath)
+        {
+            using (var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                var fileToSend = new InputOnlineFile(fileStream, Path.GetFileName(filePath));
+                await botClient.SendDocumentAsync(chatId, fileToSend, "Here's your file!");
+            }
+            
+                MessageBox.Show("file sent successfully");
+        }
+        private void btnChooseColor_Click(object sender, EventArgs e)
+        {
+            ColorDialog colorDialog = new ColorDialog();
+            if (colorDialog.ShowDialog() == DialogResult.OK)
+            {
+                selectedColor = colorDialog.Color;
             }
         }
 
@@ -473,7 +203,7 @@ namespace MyWinFormsApp
         {
             if (isDrawing && startPoint != Point.Empty && endPoint != Point.Empty)
             {
-                Pen p = new Pen(Color.Yellow);
+                Pen p = new Pen(selectedColor);
 
                 switch (selectedShape)
                 {
@@ -554,7 +284,7 @@ namespace MyWinFormsApp
         private void ColorArea_Circle(Rectangle boundingBox, ColorMap colorMap)
         {
             int radius = boundingBox.Width / 2;
-            System.Drawing.Point center = new System.Drawing.Point(boundingBox.X + radius, boundingBox.Y + radius);
+            Point center = new Point(boundingBox.X + radius, boundingBox.Y + radius);
 
             for (int x = boundingBox.Left; x < boundingBox.Right; x++)
             {
@@ -578,7 +308,7 @@ namespace MyWinFormsApp
             }
         }
 
-        private void ColorArea_Triangle(System.Drawing.Point[] triangle, ColorMap colorMap)
+        private void ColorArea_Triangle(Point[] triangle, ColorMap colorMap)
         {
             using (GraphicsPath path = new GraphicsPath())
             {
@@ -615,6 +345,8 @@ namespace MyWinFormsApp
                     return MapBrightnessToColor_Jet(brightness);
                 case ColorMap.Ocean:
                     return MapBrightnessToColor_Ocean(brightness);
+                case ColorMap.CustomGradient:
+                    return MapBrightnessToColor_CustomGradient(brightness);
                 default:
                     return Color.FromArgb(brightness, brightness, brightness);
             }
@@ -683,6 +415,15 @@ namespace MyWinFormsApp
             }
         }
 
+        private Color MapBrightnessToColor_CustomGradient(int brightness)
+        {
+            double ratio = (double)brightness / 255.0;
+            int r = (int)(selectedColor.R * ratio);
+            int g = (int)(selectedColor.G * ratio);
+            int b = (int)(selectedColor.B * ratio);
+            return Color.FromArgb(r, g, b);
+        }
+
         private void btnIdentifyArea_Click(object sender, EventArgs e)
         {
             if (originalImage == null)
@@ -691,7 +432,7 @@ namespace MyWinFormsApp
                 return;
             }
 
-            if (startPoint == System.Drawing.Point.Empty || endPoint == System.Drawing.Point.Empty)
+            if (startPoint == Point.Empty || endPoint == Point.Empty)
             {
                 MessageBox.Show("Please select a region to identify and color.");
                 return;
@@ -710,8 +451,8 @@ namespace MyWinFormsApp
                     break;
             }
 
-            startPoint = System.Drawing.Point.Empty;
-            endPoint = System.Drawing.Point.Empty;
+            startPoint = Point.Empty;
+            endPoint = Point.Empty;
         }
 
         private void IdentifyAndColorRectangle()
@@ -719,18 +460,9 @@ namespace MyWinFormsApp
             Rectangle rect = GetRectangle(startPoint, endPoint);
             ColorArea(rect, selectedColorMap);
             pictureBoxOriginal.Invalidate();
-
-            // delete later 
             // Calculate the size of the rectangle
-            int width = rect.Width;
-            int height = rect.Height;
-            int area = width * height;
+            int area = rect.Width * rect.Height;
 
-            // Print out the result
-            Console.WriteLine("Rectangle Size:");
-            Console.WriteLine("Width: " + width);
-            Console.WriteLine("Height: " + height);
-            Console.WriteLine("Area: " + area);
             totalArea += area;
 
         }
@@ -746,18 +478,12 @@ namespace MyWinFormsApp
             double radius = diameter / 2.0;
             double area = Math.PI * Math.Pow(radius, 2);
 
-            // Print out the result
-            Console.WriteLine("Circle Size:");
-            Console.WriteLine("Diameter: " + diameter);
-            Console.WriteLine("Radius: " + radius);
-            Console.WriteLine("Area: " + area);
             totalArea += area;
-            System.Console.WriteLine("Total area : "+totalArea);    
         }
 
         private void IdentifyAndColorTriangle()
         {
-            System.Drawing.Point[] triangle = GetTrianglePoints(startPoint, endPoint);
+            Point[] triangle = GetTrianglePoints(startPoint, endPoint);
             ColorArea_Triangle(triangle, selectedColorMap);
             pictureBoxOriginal.Invalidate();
 
@@ -767,11 +493,6 @@ namespace MyWinFormsApp
             double height = Math.Abs(triangle[1].Y - triangle[0].Y);
             double area = (baseLength * height) / 2.0;
 
-            // Print out the result
-            Console.WriteLine("Triangle Size:");
-            Console.WriteLine("Base Length: " + baseLength);
-            Console.WriteLine("Height: " + height);
-            Console.WriteLine("Area: " + area);
             totalArea += area;
 
         }
@@ -784,7 +505,7 @@ namespace MyWinFormsApp
                 return;
             }
 
-            if (startPoint == System.Drawing.Point.Empty || endPoint == System.Drawing.Point.Empty)
+            if (startPoint == Point.Empty || endPoint == Point.Empty)
             {
                 MessageBox.Show("Please select a region to crop.");
                 return;
@@ -797,8 +518,8 @@ namespace MyWinFormsApp
 
             pictureBoxOriginal.Image = modifiedGrayImage;
 
-            startPoint = System.Drawing.Point.Empty;
-            endPoint = System.Drawing.Point.Empty;
+            startPoint = Point.Empty;
+            endPoint = Point.Empty;
         }
 
         private Bitmap CropImage(Bitmap source, Rectangle cropRect)
@@ -812,45 +533,6 @@ namespace MyWinFormsApp
             return croppedImage;
         }
 
-        // private void btnSave_Click(object sender, EventArgs e)
-        // {
-        //     if (modifiedGrayImage == null)
-        //     {
-        //         MessageBox.Show("No colored image to save.");
-        //         return;
-        //     }
-
-        //     SaveFileDialog saveFileDialog = new SaveFileDialog
-        //     {
-        //         Filter = "JPEG Image|*.jpg|PNG Image|*.png"
-        //     };
-        //     if (saveFileDialog.ShowDialog() == DialogResult.OK)
-        //     {
-        //         modifiedGrayImage.Save(saveFileDialog.FileName);
-        //         MessageBox.Show("Colored image saved successfully.");
-        //     }
-        // }
-
-
-        // private void btnSaveText_Click(object sender, EventArgs e)
-        // {
-        //     if (string.IsNullOrEmpty(txtInput.Text))
-        //     {
-        //         MessageBox.Show("Please enter text to save.");
-        //         return;
-        //     }
-
-        //     SaveFileDialog saveFileDialog = new SaveFileDialog
-        //     {
-        //         Filter = "Text File|*.txt"
-        //     };
-
-        //     if (saveFileDialog.ShowDialog() == DialogResult.OK)
-        //     {
-        //         File.WriteAllText(saveFileDialog.FileName, txtInput.Text);
-        //         MessageBox.Show("Text saved successfully.");
-        //     }
-        // }
         private void btnSave_Click(object sender, EventArgs e)
         {
             if (modifiedGrayImage == null)
@@ -874,9 +556,9 @@ namespace MyWinFormsApp
                 return;
             }
             // saving the image first 
-        
-            // string savePath = Path.Combine("D://newtest/",folderPath,"/",fileName + ".jpg");
+
             string savePath = $"{folderPath}/{fileName}.jpg";
+            fPath = savePath;
             System.Console.WriteLine(savePath);
 
             modifiedGrayImage.Save(savePath);
@@ -894,7 +576,7 @@ namespace MyWinFormsApp
                 do
                 {
                     string incrementedFileName = $"_a{count}{extension}";
-                    zipFilePath = Path.Combine($"D://newtest/{fileName}", incrementedFileName);
+                    zipFilePath = Path.Combine($"C://newtest/{fileName}", incrementedFileName);
                     count++;
                 } while (File.Exists(zipFilePath));
             }
@@ -912,338 +594,345 @@ namespace MyWinFormsApp
             }
         }
 
-            private string PromptForFileName()
-            {
-                string fileName = Interaction.InputBox("Enter the filename for the modified image (without extension):", "Enter Filename", "");
+        private string PromptForFileName()
+        {
+            string fileName = Interaction.InputBox("Enter the filename for the modified image (without extension):", "Enter Filename", "");
 
-                return fileName;
-            }
-            private void btnSaveText_Click(object sender, EventArgs e)
+            return fileName;
+        }
+        private void btnSaveText_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrEmpty(txtInput.Text))
             {
-                if (string.IsNullOrEmpty(txtInput.Text))
+                MessageBox.Show("Please enter text to save.");
+                return;
+            }
+
+            // // Specify the path where you want to save the text file
+            // string savePath = folderPath + "/text.txt";
+            // System.Console.WriteLine(savePath);
+
+            // File.WriteAllText(savePath, txtInput.Text);
+            // MessageBox.Show("Text saved successfully at: " + savePath);
+            using (Graphics g = Graphics.FromImage(modifiedGrayImage))
+            {
+                using (Font font = new Font("Arial", 16))
                 {
-                    MessageBox.Show("Please enter text to save.");
-                    return;
+                    g.DrawString(txtInput.Text, font, Brushes.Yellow, startPoint);
+                }
+            }
+
+            pictureBoxOriginal.Image = modifiedGrayImage;
+        }
+
+
+        private void btnRecordAudio_Click(object sender, EventArgs e)
+        {
+            // StartRecording();
+            RecordAudio2(folderPath + "/");
+        }
+        static void RecordAudio2(string outputAudioFile)
+        {
+            using (var waveIn = new WaveInEvent())
+            {
+                waveIn.WaveFormat = new WaveFormat(44100, 1);
+                WaveFileWriter waveFileWriter = null;
+                waveIn.DataAvailable += (sender, e) =>
+                {
+                    if (waveFileWriter == null)
+                    {
+                        waveFileWriter = new WaveFileWriter(outputAudioFile + "Rec.wav", waveIn.WaveFormat);
+                    }
+                    waveFileWriter.Write(e.Buffer, 0, e.BytesRecorded);
+                };
+
+
+                waveIn.StartRecording();
+                Console.WriteLine("Recording for 10 seconds...");
+                MessageBox.Show("Recording started. Please speak for 10 seconds.");
+                Task.Delay(10000).Wait();
+                waveIn.StopRecording();
+
+
+                waveFileWriter?.Dispose();
+                Console.WriteLine("Recording stopped. Audio saved to: " + outputAudioFile);
+                MessageBox.Show("Recording stopped. Audio saved to: " + outputAudioFile);
+
+            }
+        }
+
+        private void btnGallery_Click(object sender, EventArgs e)
+        {
+            // Create a new form for the gallery
+            Form galleryForm = new Form
+            {
+                Text = "Image Gallery",
+                Width = 800,
+                Height = 600
+            };
+
+            // Create a flow layout panel to hold the images
+            FlowLayoutPanel galleryPanel = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                AutoScroll = true,
+                Padding = new Padding(10)
+            };
+
+            // Create the switch button
+            Button switchButton = new Button
+            {
+                Text = "Switch Sorting",
+                Dock = DockStyle.Top,
+                Size = new Size(30, 30),
+
+            };
+
+            // Create the label to display the current sorting option
+            Label sortingLabel = new Label
+            {
+                Text = "Sorting by: Size",
+                Dock = DockStyle.Top,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = new Font(FontFamily.GenericSansSerif, 12, FontStyle.Bold)
+            };
+
+            // Sort images based on the selected option (size or last modified date)
+            List<string> sortedImages;
+            bool sortBySize = true; // Set to true for sorting by size, false for sorting by last modified date
+
+            void SwitchSorting()
+            {
+                sortBySize = !sortBySize;
+                if (sortBySize)
+                {
+                    sortingLabel.Text = "Sorting by: Size";
+                    sortedImages = GetSortedImages();
+                }
+                else
+                {
+                    sortingLabel.Text = "Sorting by: Last Modified";
+                    sortedImages = GetSortedImagesLastModified();
                 }
 
-                // Specify the path where you want to save the text file
-                string savePath = folderPath + "/text.txt";
-                System.Console.WriteLine(savePath);
+                // Clear existing images in the gallery panel
+                galleryPanel.Controls.Clear();
 
-                File.WriteAllText(savePath, txtInput.Text);
-                MessageBox.Show("Text saved successfully at: " + savePath);
-            }
-
-
-            private void btnRecordAudio_Click(object sender, EventArgs e)
-            {
-                // StartRecording();
-                RecordAudio2(folderPath + "/");
-            }
-            static void RecordAudio2(string outputAudioFile)
-            {
-                using (var waveIn = new WaveInEvent())
+                // Load and display the sorted images in the gallery panel
+                foreach (string imagePath in sortedImages)
                 {
-                    waveIn.WaveFormat = new WaveFormat(44100, 1);
-                    WaveFileWriter waveFileWriter = null;
-                    waveIn.DataAvailable += (sender, e) =>
+                    PictureBox pictureBox = new PictureBox
                     {
-                        if (waveFileWriter == null)
-                        {
-                            waveFileWriter = new WaveFileWriter(outputAudioFile + "Rec.wav", waveIn.WaveFormat);
-                        }
-                        waveFileWriter.Write(e.Buffer, 0, e.BytesRecorded);
+                        Image = System.Drawing.Image.FromFile(imagePath),
+                        SizeMode = PictureBoxSizeMode.AutoSize,
+                        Margin = new Padding(10),
+                        Tag = imagePath  // Store the image path in the Tag property
                     };
 
-
-                    waveIn.StartRecording();
-                    Console.WriteLine("Recording for 10 seconds...");
-                    MessageBox.Show("Recording started. Please speak for 10 seconds.");
-                    Task.Delay(10000).Wait();
-                    waveIn.StopRecording();
-
-
-                    waveFileWriter?.Dispose();
-                    Console.WriteLine("Recording stopped. Audio saved to: " + outputAudioFile);
-                    MessageBox.Show("Recording stopped. Audio saved to: " + outputAudioFile);
-
+                    pictureBox.Click += PictureBox_Click;  // Assign the event handler
+                    galleryPanel.Controls.Add(pictureBox);
                 }
             }
-        
-            private void btnGallery_Click(object sender, EventArgs e)
-            {
-                // Create a new form for the gallery
-                Form galleryForm = new Form
-                {
-                    Text = "Image Gallery",
-                    Width = 800,
-                    Height = 600
-                };
 
-                // Create a flow layout panel to hold the images
-                FlowLayoutPanel galleryPanel = new FlowLayoutPanel
-                {
-                    Dock = DockStyle.Fill,
-                    AutoScroll = true,
-                    Padding = new Padding(10)
-                };
+            switchButton.Click += (s, ev) => SwitchSorting();
 
-                // Create the switch button
-                Button switchButton = new Button
-                {
-                    Text = "Switch Sorting",
-                    Dock = DockStyle.Top,
-                    Size = new Size(30, 30),
+            galleryForm.Controls.Add(switchButton);
+            galleryForm.Controls.Add(sortingLabel);
+            galleryForm.Controls.Add(galleryPanel);
 
-                };
-
-                // Create the label to display the current sorting option
-                Label sortingLabel = new Label
-                {
-                    Text = "Sorting by: Size",
-                    Dock = DockStyle.Top,
-                    TextAlign = ContentAlignment.MiddleCenter,
-                    Font = new Font(FontFamily.GenericSansSerif, 12, FontStyle.Bold)
-                };
-
-                // Sort images based on the selected option (size or last modified date)
-                List<string> sortedImages;
-                bool sortBySize = true; // Set to true for sorting by size, false for sorting by last modified date
-
-                void SwitchSorting()
-                {
-                    sortBySize = !sortBySize;
-                    if (sortBySize)
-                    {
-                        sortingLabel.Text = "Sorting by: Size";
-                        sortedImages = GetSortedImages();
-                    }
-                    else
-                    {
-                        sortingLabel.Text = "Sorting by: Last Modified";
-                        sortedImages = GetSortedImagesLastModified();
-                    }
-
-                    // Clear existing images in the gallery panel
-                    galleryPanel.Controls.Clear();
-
-                    // Load and display the sorted images in the gallery panel
-                    foreach (string imagePath in sortedImages)
-                    {
-                        PictureBox pictureBox = new PictureBox
-                        {
-                            Image = System.Drawing.Image.FromFile(imagePath),
-                            SizeMode = PictureBoxSizeMode.AutoSize,
-                            Margin = new Padding(10),
-                            Tag = imagePath  // Store the image path in the Tag property
-                        };
-
-                        pictureBox.Click += PictureBox_Click;  // Assign the event handler
-                        galleryPanel.Controls.Add(pictureBox);
-                    }
-                }
-
-                // switchButton.Click += (s, ev) => SwitchSorting(); // Assign the event handler for the switch button
-                switchButton.Click += (s, ev) => SwitchSorting();
-
-                galleryForm.Controls.Add(switchButton);
-                galleryForm.Controls.Add(sortingLabel);
-                galleryForm.Controls.Add(galleryPanel);
-
-                // Show the gallery form
-                galleryForm.ShowDialog();
-            }
-            private List<string> GetSortedImagesLastModified()
-            {
-                string directoryPath = "D://newtest";
-                string[] imageFiles = Directory.GetFiles(directoryPath, "*.jpg", SearchOption.AllDirectories)
-                    .Concat(Directory.GetFiles(directoryPath, "*.png", SearchOption.AllDirectories))
-                    .ToArray();
-
-                // Sort the image files by last modified date in descending order
-                Array.Sort(imageFiles, (a, b) =>
-                {
-                    FileInfo fileInfoA = new FileInfo(a);
-                    FileInfo fileInfoB = new FileInfo(b);
-                    return fileInfoB.LastWriteTime.CompareTo(fileInfoA.LastWriteTime); // Compare in reverse order
-                });
-
-                // Convert the array to a list and return
-                return new List<string>(imageFiles);
-            }
-            private List<string> GetSortedImages()
-            {
-                string directoryPath = "D://newtest"; // Replace with your actual directory path
-                                                      // string[] imageFiles = Directory.GetFiles(directoryPath, "*.jpg"); // Change the file extension as needed
-                string[] imageFiles = Directory.GetFiles(directoryPath, "*.jpg", SearchOption.AllDirectories)
+            // Show the gallery form
+            galleryForm.ShowDialog();
+        }
+        private List<string> GetSortedImagesLastModified()
+        {
+            string directoryPath = "D://newtest";
+            string[] imageFiles = Directory.GetFiles(directoryPath, "*.jpg", SearchOption.AllDirectories)
                 .Concat(Directory.GetFiles(directoryPath, "*.png", SearchOption.AllDirectories))
                 .ToArray();
 
-                // Sort the image files by size in ascending order
-                Array.Sort(imageFiles, (a, b) =>
-                {
-                    FileInfo fileInfoA = new FileInfo(a);
-                    FileInfo fileInfoB = new FileInfo(b);
-                    return fileInfoA.Length.CompareTo(fileInfoB.Length);
-                });
-
-                // Convert the array to a list and return
-                return new List<string>(imageFiles);
-            }
-            private void PictureBox_Click(object sender, EventArgs e)
+            // Sort the image files by last modified date in descending order
+            Array.Sort(imageFiles, (a, b) =>
             {
-                PictureBox pictureBox = (PictureBox)sender;
-                string imagePath = pictureBox.Tag.ToString();
-                displayedimage = imagePath;
-                LoadImage(imagePath);
+                FileInfo fileInfoA = new FileInfo(a);
+                FileInfo fileInfoB = new FileInfo(b);
+                return fileInfoB.LastWriteTime.CompareTo(fileInfoA.LastWriteTime); // Compare in reverse order
+            });
 
-                Form galleryForm = (Form)pictureBox.Parent.Parent;
-                galleryForm.Close();
+            // Convert the array to a list and return
+            return new List<string>(imageFiles);
+        }
+        private List<string> GetSortedImages()
+        {
+            string directoryPath = "D://newtest"; // Replace with your actual directory path
+            string[] imageFiles = Directory.GetFiles(directoryPath, "*.jpg", SearchOption.AllDirectories)
+            .Concat(Directory.GetFiles(directoryPath, "*.png", SearchOption.AllDirectories))
+            .ToArray();
+
+            // Sort the image files by size in ascending order
+            Array.Sort(imageFiles, (a, b) =>
+            {
+                FileInfo fileInfoA = new FileInfo(a);
+                FileInfo fileInfoB = new FileInfo(b);
+                return fileInfoA.Length.CompareTo(fileInfoB.Length);
+            });
+
+            // Convert the array to a list and return
+            return new List<string>(imageFiles);
+        }
+        private void PictureBox_Click(object sender, EventArgs e)
+        {
+            PictureBox pictureBox = (PictureBox)sender;
+            string imagePath = pictureBox.Tag.ToString();
+            displayedimage = imagePath;
+            LoadImage(imagePath);
+
+            Form galleryForm = (Form)pictureBox.Parent.Parent;
+            galleryForm.Close();
+        }
+
+        private void CheckConditionButton_Click(object sender, EventArgs e)
+        {
+            string condition;
+
+            if (hsv1value >= 0 && hsv1value <= 21456995)
+            {
+                condition = "Mild";
+            }
+            else if (hsv1value > 21456995 && hsv1value <= 126979253)
+            {
+                condition = "Medium";
+            }
+            else
+            {
+                condition = "Severe";
             }
 
-            private void CheckConditionButton_Click(object sender, EventArgs e)
+            string message = "Total Area: " + hsv1value + "\nCondition: " + condition;
+            MessageBox.Show(message, "Condition Report", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        private void ProcessImage()
+        {
+            if (pictureBoxOriginal.Image != null)
             {
-                string condition;
+                // Get the original image from the PictureBox
+                Bitmap originalImage = new Bitmap(pictureBoxOriginal.Image);
+                int newWidth = (int)Math.Pow(2, Math.Ceiling(Math.Log(originalImage.Width, 2)));
+                int newHeight = (int)Math.Pow(2, Math.Ceiling(Math.Log(originalImage.Height, 2)));
+                // Resize the image
+                ResizeBilinear resizeFilter = new ResizeBilinear(newWidth, newHeight);
+                Bitmap resizedImage = resizeFilter.Apply(originalImage);
 
-                if (hsv1value >= 0 && hsv1value <= 21456995)
+                // Convert the image to grayscale
+                Grayscale grayscaleFilter = new Grayscale(0.2125, 0.7154, 0.0721);
+                Bitmap grayscaleImage = grayscaleFilter.Apply(resizedImage);
+
+                // Apply Fourier transformation
+                ComplexImage complexImage = ComplexImage.FromBitmap(grayscaleImage);
+                complexImage.ForwardFourierTransform();
+
+                // Apply high-pass filter to enhance the image
+                int width = complexImage.Width;
+                int height = complexImage.Height;
+                double cutoff = 0.1; // Adjust this value based on desired enhancement
+
+                for (int u = 0; u < width; u++)
                 {
-                    condition = "Mild";
-                }
-                else if (hsv1value > 21456995 && hsv1value <= 126979253)
-                {
-                    condition = "Medium";
-                }
-                else
-                {
-                    condition = "Severe";
-                }
-
-                string message = "Total Area: " + hsv1value + "\nCondition: " + condition;
-                MessageBox.Show(message, "Condition Report", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            private void ProcessImage()
-            {
-                if (pictureBoxOriginal.Image != null)
-                {
-                    // Get the original image from the PictureBox
-                    Bitmap originalImage = new Bitmap(pictureBoxOriginal.Image);
-                    int newWidth = (int)Math.Pow(2, Math.Ceiling(Math.Log(originalImage.Width, 2)));
-                    int newHeight = (int)Math.Pow(2, Math.Ceiling(Math.Log(originalImage.Height, 2)));
-                    // Resize the image
-                    ResizeBilinear resizeFilter = new ResizeBilinear(newWidth, newHeight);
-                    Bitmap resizedImage = resizeFilter.Apply(originalImage);
-
-                    // Convert the image to grayscale
-                    Grayscale grayscaleFilter = new Grayscale(0.2125, 0.7154, 0.0721);
-                    Bitmap grayscaleImage = grayscaleFilter.Apply(resizedImage);
-
-                    // Apply Fourier transformation
-                    ComplexImage complexImage = ComplexImage.FromBitmap(grayscaleImage);
-                    complexImage.ForwardFourierTransform();
-
-                    // Apply high-pass filter to enhance the image
-                    int width = complexImage.Width;
-                    int height = complexImage.Height;
-                    double cutoff = 0.1; // Adjust this value based on desired enhancement
-
-                    for (int u = 0; u < width; u++)
+                    for (int v = 0; v < height; v++)
                     {
-                        for (int v = 0; v < height; v++)
+                        double distance = Math.Sqrt(Math.Pow(u - width / 2, 2) + Math.Pow(v - height / 2, 2));
+                        if (distance < cutoff * Math.Min(width, height))
                         {
-                            double distance = Math.Sqrt(Math.Pow(u - width / 2, 2) + Math.Pow(v - height / 2, 2));
-                            if (distance < cutoff * Math.Min(width, height))
-                            {
-                                complexImage.Data[v, u] = new Complex(0, 0);
-                            }
+                            complexImage.Data[v, u] = new Complex(0, 0);
                         }
                     }
-
-
-                    // Apply inverse Fourier transformation
-                    complexImage.BackwardFourierTransform();
-
-                    // Get the enhanced image
-                    Bitmap enhancedImage = complexImage.ToBitmap();
-
-                    // Save the enhanced image
-                    SaveEnhancedImage(enhancedImage);
                 }
-                else
-                {
-                    MessageBox.Show("No image selected.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
+
+
+                // Apply inverse Fourier transformation
+                complexImage.BackwardFourierTransform();
+
+                // Get the enhanced image
+                Bitmap enhancedImage = complexImage.ToBitmap();
+
+                // Save the enhanced image
+                SaveEnhancedImage(enhancedImage);
             }
-            private void SaveEnhancedImage(Bitmap image)
+            else
             {
-                string fileName = PromptForFileName();
-
-                if (string.IsNullOrEmpty(fileName))
-                {
-                    MessageBox.Show("Filename cannot be empty.");
-                    return;
-                }
-
-                string savePath = Path.Combine("D://newtest/", fileName + ".jpg");
-
-                image.Save(savePath);
-                MessageBox.Show("Enhanced image saved successfully at: " + savePath);
+                MessageBox.Show("No image selected.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-            private void GenerateReportButton_Click(object sender, EventArgs e)
+        }
+        private void SaveEnhancedImage(Bitmap image)
+        {
+            string fileName = PromptForFileName();
+
+            if (string.IsNullOrEmpty(fileName))
             {
-                using (Form inputForm = new Form())
-                {
-                    inputForm.Text = "Enter Patient Information";
-
-                    Label nameLabel = new Label() { Text = "Name", Top = 20, Left = 20 };
-                    TextBox nameTextBox = new TextBox() { Top = 20, Left = 120 };
-
-                    Label ageLabel = new Label() { Text = "Age", Top = 60, Left = 20 };
-                    TextBox ageTextBox = new TextBox() { Top = 60, Left = 120 };
-
-                    Label genderLabel = new Label() { Text = "Gender", Top = 100, Left = 20 };
-                    TextBox genderTextBox = new TextBox() { Top = 100, Left = 120 };
-
-                    Label doctorFindings = new Label() { Text = "Doctor Fin ", Top = 140, Left = 20 };
-                    TextBox doctorFindingsTextBox = new TextBox() { Top = 140, Left = 120 };
-
-                    Label doctorRec = new Label() { Text = "Doctor Rec", Top = 180, Left = 20 };
-                    TextBox doctorRecTextBox = new TextBox() { Top = 180, Left = 120 };
-
-                    Button submitButton = new Button() { Text = "Submit", Top = 220, Left = 100 };
-                    submitButton.Click += (s, eArgs) =>
-                    {
-                        // Collect input values
-                        string name = nameTextBox.Text;
-                        string age = ageTextBox.Text;
-                        string gender = genderTextBox.Text;
-                        string mainImagePath = displayedimage;
-                        string df = doctorFindingsTextBox.Text;
-                        string dr = doctorRecTextBox.Text;
-
-
-
-                        // Generate the report
-                        Report.GenerateMedicalReport(name, age, gender, mainImagePath, "D://newtest/noore.png", df, dr, folderPath);
-
-                        MessageBox.Show("Medical report generated successfully.");
-                        inputForm.Close();
-                    };
-
-                    inputForm.Controls.Add(nameLabel);
-                    inputForm.Controls.Add(nameTextBox);
-                    inputForm.Controls.Add(ageLabel);
-                    inputForm.Controls.Add(ageTextBox);
-                    inputForm.Controls.Add(genderLabel);
-                    inputForm.Controls.Add(genderTextBox);
-                    inputForm.Controls.Add(doctorFindings);
-                    inputForm.Controls.Add(doctorFindingsTextBox);
-                    inputForm.Controls.Add(doctorRec);
-                    inputForm.Controls.Add(doctorRecTextBox);
-                    inputForm.Controls.Add(submitButton);
-
-                    inputForm.ShowDialog();
-                }
+                MessageBox.Show("Filename cannot be empty.");
+                return;
             }
+
+            string savePath = Path.Combine("D://newtest/", fileName + ".jpg");
+
+            image.Save(savePath);
+            MessageBox.Show("Enhanced image saved successfully at: " + savePath);
+        }
+        private void GenerateReportButton_Click(object sender, EventArgs e)
+        {
+            using (Form inputForm = new Form())
+            {
+                inputForm.Text = "Enter Patient Information";
+
+                Label nameLabel = new Label() { Text = "Name", Top = 20, Left = 20 };
+                TextBox nameTextBox = new TextBox() { Top = 20, Left = 120 };
+
+                Label ageLabel = new Label() { Text = "Age", Top = 60, Left = 20 };
+                TextBox ageTextBox = new TextBox() { Top = 60, Left = 120 };
+
+                Label genderLabel = new Label() { Text = "Gender", Top = 100, Left = 20 };
+                TextBox genderTextBox = new TextBox() { Top = 100, Left = 120 };
+
+                Label doctorFindings = new Label() { Text = "Doctor Fin ", Top = 140, Left = 20 };
+                TextBox doctorFindingsTextBox = new TextBox() { Top = 140, Left = 120 };
+
+                Label doctorRec = new Label() { Text = "Doctor Rec", Top = 180, Left = 20 };
+                TextBox doctorRecTextBox = new TextBox() { Top = 180, Left = 120 };
+
+                Button submitButton = new Button() { Text = "Submit", Top = 220, Left = 100 };
+                submitButton.Click += (s, eArgs) =>
+                {
+                    // Collect input values
+                    string name = nameTextBox.Text;
+                    string age = ageTextBox.Text;
+                    string gender = genderTextBox.Text;
+                    string mainImagePath = displayedimage;
+                    string df = doctorFindingsTextBox.Text;
+                    string dr = doctorRecTextBox.Text;
+
+
+
+                    // Generate the report
+                    Report.GenerateMedicalReport(name, age, gender, mainImagePath, "D://newtest/noore.png", df, dr, folderPath);
+
+                    MessageBox.Show("Medical report generated successfully.");
+                    inputForm.Close();
+                };
+
+                inputForm.Controls.Add(nameLabel);
+                inputForm.Controls.Add(nameTextBox);
+                inputForm.Controls.Add(ageLabel);
+                inputForm.Controls.Add(ageTextBox);
+                inputForm.Controls.Add(genderLabel);
+                inputForm.Controls.Add(genderTextBox);
+                inputForm.Controls.Add(doctorFindings);
+                inputForm.Controls.Add(doctorFindingsTextBox);
+                inputForm.Controls.Add(doctorRec);
+                inputForm.Controls.Add(doctorRecTextBox);
+                inputForm.Controls.Add(submitButton);
+
+                inputForm.ShowDialog();
+            }
+        }
         private int Test()
         {
             return hsv1value;
@@ -1261,8 +950,6 @@ namespace MyWinFormsApp
             return (int)sum.V0;
         }
 
-        }
-        
     }
 
-
+}
